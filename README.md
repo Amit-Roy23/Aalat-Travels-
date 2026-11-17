@@ -35,7 +35,18 @@ With `ANTHROPIC_API_KEY` set, replies come from **Claude** (90+ languages). With
 
 ---
 
-## Deploy on Vercel
+## Deploy on Vercel (frontend + backend in one project)
+
+This is a **single Next.js project**: the pages (frontend) and the `/api/*` routes (backend, including the WhatsApp and lead-capture webhooks) build and deploy together. One Vercel project and one domain serve everything. There is no separate server to host.
+
+```
+https://your-app.vercel.app/            → frontend (dashboard, leads, inbox…)
+https://your-app.vercel.app/api/...     → backend API (serverless functions)
+https://your-app.vercel.app/api/health  → deployment check (env vars + database)
+```
+
+`vercel.json` pins the framework, the build command and the **Mumbai region (`bom1`)**, so the API runs close to your users and to a MongoDB Atlas cluster in Mumbai (AWS `ap-south-1`). If your Atlas cluster is in another region, change `regions` to the nearest Vercel region.
+
 
 1. **MongoDB Atlas** — create a cluster and a database user. In *Network Access* allow `0.0.0.0/0` (Vercel uses dynamic IPs). Copy the connection string and **include a database name**, e.g. `.../aalat_travels?retryWrites=true&w=majority`.
 2. **Import the repo in Vercel** (framework: Next.js; no build settings to change).
@@ -53,7 +64,8 @@ With `ANTHROPIC_API_KEY` set, replies come from **Claude** (90+ languages). With
 | `META_PAGE_ACCESS_TOKEN` | optional | For Facebook/Instagram Lead Ads capture |
 | `META_VERIFY_TOKEN` | optional | Verify token for the Lead Ads webhook |
 
-4. **Deploy**, open the site, and complete the **first-time setup** (company name + admin account). Tick *Load demo data* to explore with sample data; you can remove it later from **Settings → Demo data**.
+4. **Deploy**, then open `https://YOUR-DOMAIN/api/health`. It should show `"db":"connected"` and `"JWT_SECRET":true`. If it doesn't, the response says which variable is missing; fix it in Vercel and redeploy.
+5. Open the site and complete the **first-time setup** (company name + admin account). Tick *Load demo data* to explore with sample data; you can remove it later from **Settings → Demo data**.
 
 ### Connect WhatsApp (Meta Cloud API)
 1. In [Meta for Developers](https://developers.facebook.com/) create an app → add **WhatsApp** → add your business phone number.

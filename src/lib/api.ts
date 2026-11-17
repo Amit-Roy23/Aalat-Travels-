@@ -60,7 +60,8 @@ export function errorResponse(e: unknown) {
   if (typeof e === "object" && e && (e as { code?: number }).code === 11000) return NextResponse.json({ error: "A record with the same unique value already exists." }, { status: 409 });
   console.error(e);
   const msg = e instanceof Error ? e.message : "Something went wrong";
-  return NextResponse.json({ error: msg.includes("MONGODB_URI") ? msg : "Something went wrong. Please try again." }, { status: 500 });
+  const envProblem = /MONGODB_URI|JWT_SECRET/.test(msg);
+  return NextResponse.json({ error: envProblem ? msg : "Something went wrong. Please try again." }, { status: 500 });
 }
 
 export async function body<T extends z.ZodTypeAny>(req: Request, schema: T): Promise<z.infer<T>> {
