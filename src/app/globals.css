@@ -1,0 +1,188 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: 246 244 239;
+  --surface: 255 255 255;
+  --surface-2: 241 238 231;
+  --line: 230 225 215;
+  --ink: 19 32 46;
+  --muted: 104 110 120;
+  --brand: 14 143 128;
+  --brand-soft: 221 243 239;
+  --brand-ink: 6 78 70;
+  --sun: 207 140 10;
+  --sun-soft: 252 241 214;
+  --coral: 220 88 66;
+  --coral-soft: 251 227 222;
+  --sky: 47 127 216;
+  --sky-soft: 224 236 251;
+  --leaf: 34 145 84;
+  --leaf-soft: 223 243 230;
+  --slate2: 100 116 139;
+  --slate2-soft: 238 240 243;
+  --wa-bubble: 217 253 211;
+  --wa-chat: 239 234 226;
+  --shadow: 19 32 46;
+  --sidebar: 13 27 42;
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  --bg: 10 15 22;
+  --surface: 18 25 34;
+  --surface-2: 25 34 45;
+  --line: 37 49 63;
+  --ink: 231 236 242;
+  --muted: 142 154 168;
+  --brand: 44 194 174;
+  --brand-soft: 16 48 45;
+  --brand-ink: 157 235 223;
+  --sun: 240 180 60;
+  --sun-soft: 56 42 14;
+  --coral: 244 120 98;
+  --coral-soft: 60 28 24;
+  --sky: 96 165 250;
+  --sky-soft: 20 38 64;
+  --leaf: 74 200 128;
+  --leaf-soft: 18 50 32;
+  --slate2: 148 163 184;
+  --slate2-soft: 32 41 54;
+  --wa-bubble: 0 92 75;
+  --wa-chat: 11 20 26;
+  --shadow: 0 0 0;
+  --sidebar: 8 14 21;
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: 10 15 22;
+    --surface: 18 25 34;
+    --surface-2: 25 34 45;
+    --line: 37 49 63;
+    --ink: 231 236 242;
+    --muted: 142 154 168;
+    --brand: 44 194 174;
+    --brand-soft: 16 48 45;
+    --brand-ink: 157 235 223;
+    --sun: 240 180 60;
+    --sun-soft: 56 42 14;
+    --coral: 244 120 98;
+    --coral-soft: 60 28 24;
+    --sky: 96 165 250;
+    --sky-soft: 20 38 64;
+    --leaf: 74 200 128;
+    --leaf-soft: 18 50 32;
+    --slate2: 148 163 184;
+    --slate2-soft: 32 41 54;
+    --wa-bubble: 0 92 75;
+    --wa-chat: 11 20 26;
+    --shadow: 0 0 0;
+    --sidebar: 8 14 21;
+    color-scheme: dark;
+  }
+}
+
+html,
+body {
+  background: rgb(var(--bg));
+  color: rgb(var(--ink));
+}
+body {
+  font-family: "Plus Jakarta Sans Variable", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+:root {
+  --font-sans: "Plus Jakarta Sans Variable";
+  --font-display: "Bricolage Grotesque Variable";
+}
+
+@layer components {
+  .card {
+    @apply rounded-2xl border border-line bg-surface shadow-card;
+  }
+  .input {
+    @apply h-10 w-full rounded-xl border border-line bg-surface px-3 text-sm text-ink outline-none transition placeholder:text-muted/70 focus:border-brand focus:ring-4 focus:ring-brand/15 disabled:opacity-60;
+  }
+  textarea.input {
+    @apply h-auto py-2.5 leading-relaxed;
+  }
+  select.input {
+    @apply appearance-none bg-no-repeat pr-9;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%23888' stroke-width='2' viewBox='0 0 24 24'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-position: right 0.7rem center;
+  }
+  .label {
+    @apply mb-1.5 block text-[13px] font-semibold text-ink/80;
+  }
+  .chip {
+    @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold;
+  }
+  .table-head {
+    @apply border-b border-line bg-surface-2/60 text-left text-[11px] font-bold uppercase tracking-wider text-muted;
+  }
+  .perforation {
+    background-image: radial-gradient(circle, rgb(var(--line)) 1.3px, transparent 1.6px);
+    background-size: 9px 4px;
+    background-repeat: repeat-x;
+    background-position: center;
+    height: 4px;
+  }
+  .wa-wallpaper {
+    background-color: rgb(var(--wa-chat));
+    background-image: radial-gradient(rgb(var(--ink) / 0.045) 1px, transparent 1px), radial-gradient(rgb(var(--ink) / 0.03) 1px, transparent 1px);
+    background-size: 22px 22px, 22px 22px;
+    background-position: 0 0, 11px 11px;
+  }
+}
+
+.scrollbar-thin::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: rgb(var(--line));
+  border-radius: 8px;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background: white !important;
+  }
+  body * {
+    visibility: hidden;
+  }
+  .print-area,
+  .print-area * {
+    visibility: visible;
+  }
+  .print-area {
+    position: absolute;
+    inset: 0 auto auto 0;
+    width: 100%;
+    box-shadow: none !important;
+    border: 0 !important;
+  }
+  @page {
+    margin: 12mm;
+  }
+}
