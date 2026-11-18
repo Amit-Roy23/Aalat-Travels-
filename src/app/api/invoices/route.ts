@@ -2,7 +2,7 @@
 import { body, escapeRegex, HttpError, oid, paging, requireUser, route, searchParams } from "@/lib/api";
 import { Customer, Invoice, Lead } from "@/lib/models";
 import { InvoiceInput } from "@/lib/validators";
-import { computeTotals, nextInvoiceNumber, recalc, refreshOverdue, shareToken } from "@/lib/services/invoices";
+import { cleanTour, computeTotals, nextInvoiceNumber, recalc, refreshOverdue, shareToken } from "@/lib/services/invoices";
 import { getSettings } from "@/lib/services/settings";
 import { logActivity } from "@/lib/services/activity";
 import { money } from "@/lib/format";
@@ -46,10 +46,12 @@ export const POST = route(async (req) => {
   if (totals.total <= 0) throw new HttpError(400, "Invoice total must be greater than zero.");
   const s = await getSettings();
   const inv = new Invoice({
-    number: await nextInvoiceNumber(s.invoice?.prefix || "AAL", data.issueDate),
+    number: await nextInvoiceNumber({ style: s.invoice?.numberStyle, prefix: s.invoice?.prefix, startNumber: s.invoice?.startNumber }, data.issueDate),
     customer: customer._id,
     lead: data.lead ? oid(data.lead) : undefined,
-    tripTitle: data.tripTitle,
+    tripTitle: data.tripTitle || data.tour?.name || "",
+    tour: cleanTour(data.tour),
+    taxType: data.taxType ?? s.invoice?.taxType ?? "cgst_sgst",
     issueDate: data.issueDate,
     dueDate: data.dueDate,
     ...totals,

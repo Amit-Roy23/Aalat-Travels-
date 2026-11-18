@@ -9,7 +9,7 @@ import { useMe } from "@/components/session";
 type Pkg = { name: string; destination: string; keywords: string[]; duration: string; pricePerPerson: number; inclusions: string; highlights: string; bestTime: string };
 type S = {
   company: Record<string, string>;
-  invoice: { prefix: string; defaultTaxRate: number; dueDays: number; terms: string; bankDetails: string; upiId: string };
+  invoice: { template: "classic" | "modern"; numberStyle: "plain" | "prefixed"; startNumber: number; taxType: "cgst_sgst" | "igst"; cancellationPolicy: string; childPolicy: string; paymentTerms: string; refundNote: string; footerNote: string; prefix: string; defaultTaxRate: number; dueDays: number; terms: string; bankDetails: string; upiId: string };
   ai: { enabled: boolean; model: string; assistantName: string; tone: string; about: string; services: string; policies: string; officeHours: string; autoCreateLead: boolean; autoFollowUp: boolean; autoStatus: boolean; packages: Pkg[]; faqs: { question: string; answer: string }[] };
   leads: { autoAssign: "none" | "round_robin"; captureApiKey?: string };
 };
@@ -103,25 +103,78 @@ export default function SettingsPage() {
                   ["phone", "Phone"],
                   ["email", "Email"],
                   ["website", "Website"],
-                  ["gstin", "GSTIN"],
+                  ["gstin", "GST IN"],
+                  ["regNo", "Registration No."],
                 ] as const
               ).map(([k, l]) => (
                 <Field key={k} label={l}>
                   <input className="input" value={s.company[k] ?? ""} onChange={(e) => set("company", { [k]: e.target.value })} />
                 </Field>
               ))}
-              <Field label="Address" className="sm:col-span-2">
+              <Field label="Corporate office address" className="sm:col-span-2">
                 <textarea className="input" rows={2} value={s.company.address ?? ""} onChange={(e) => set("company", { address: e.target.value })} />
+              </Field>
+              <Field label="Logo (printed on invoices)" className="sm:col-span-2" hint="PNG / JPG / WebP. It is resized automatically. Without a logo, a round emblem with the company name is used.">
+                <div className="flex items-center gap-3">
+                  {s.company.logo ? <img src={s.company.logo} alt="Logo" className="h-16 w-16 rounded-full border border-line bg-white object-contain" /> : <span className="flex h-16 w-16 items-center justify-center rounded-full border border-dashed border-line text-[10px] text-muted">No logo</span>}
+                  <label className="cursor-pointer rounded-xl border border-line px-3 py-2 text-sm font-semibold hover:bg-surface-2">
+                    Upload
+                    <input type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      e.target.value = "";
+                      if (!file) return;
+                      try {
+                        set("company", { logo: await resizeImage(file, 320) });
+                      } catch {
+                        toast("Could not read that image", "error");
+                      }
+                    }} />
+                  </label>
+                  {s.company.logo && (
+                    <Button type="button" variant="ghost" size="sm" onClick={() => set("company", { logo: "" })}>
+                      Remove
+                    </Button>
+                  )}
+                </div>
               </Field>
             </div>
           </Card>
         )}
 
         {sec === "billing" && (
-          <Card title={<span className="flex items-center gap-2"><FileText className="h-4 w-4" /> Invoice defaults</span>}>
+          <>
+          <Card title={<span className="flex items-center gap-2"><FileText className="h-4 w-4" /> Invoice format & numbering</span>}>
             <div className="grid gap-3.5 sm:grid-cols-3">
-              <Field label="Invoice prefix" hint="e.g. AAL → AAL-2026-0001">
-                <input className="input uppercase" value={s.invoice.prefix} onChange={(e) => set("invoice", { prefix: e.target.value.toUpperCase() })} maxLength={8} />
+              <Field label="Default invoice format" hint="Used for printing and the customer share link">
+                <select className="input" value={s.invoice.template} onChange={(e) => set("invoice", { template: e.target.value as S["invoice"]["template"] })}>
+                  <option value="classic">Aalat Travels format (red, like the printed book)</option>
+                  <option value="modern">Modern</option>
+                </select>
+              </Field>
+              <Field label="Invoice numbers">
+                <select className="input" value={s.invoice.numberStyle} onChange={(e) => set("invoice", { numberStyle: e.target.value as S["invoice"]["numberStyle"] })}>
+                  <option value="plain">Plain sequence (2952, 2953 …)</option>
+                  <option value="prefixed">Prefix + year (AAL-2026-0001)</option>
+                </select>
+              </Field>
+              {s.invoice.numberStyle === "plain" ? (
+                <Field label="Start numbering from" hint="E.g. the next number in your paper invoice book. Numbers are never reused.">
+                  <input className="input" type="number" min={1} value={s.invoice.startNumber} onChange={(e) => set("invoice", { startNumber: Number(e.target.value) })} />
+                </Field>
+              ) : (
+                <Field label="Invoice prefix" hint="e.g. AAL → AAL-2026-0001">
+                  <input className="input uppercase" value={s.invoice.prefix} onChange={(e) => set("invoice", { prefix: e.target.value.toUpperCase() })} maxLength={8} />
+                </Field>
+              )}
+            </div>
+          </Card>
+          <Card title="Tax, payment & bank details">
+            <div className="grid gap-3.5 sm:grid-cols-3">
+              <Field label="Default GST type">
+                <select className="input" value={s.invoice.taxType} onChange={(e) => set("invoice", { taxType: e.target.value as S["invoice"]["taxType"] })}>
+                  <option value="cgst_sgst">CGST + SGST (customer in West Bengal)</option>
+                  <option value="igst">IGST (customer in another state)</option>
+                </select>
               </Field>
               <Field label="Default GST %">
                 <input className="input" type="number" min={0} max={100} value={s.invoice.defaultTaxRate} onChange={(e) => set("invoice", { defaultTaxRate: Number(e.target.value) })} />
@@ -135,11 +188,31 @@ export default function SettingsPage() {
               <Field label="Bank details" className="sm:col-span-2">
                 <textarea className="input" rows={3} value={s.invoice.bankDetails} onChange={(e) => set("invoice", { bankDetails: e.target.value })} placeholder={"Account name\nAccount no.\nIFSC"} />
               </Field>
-              <Field label="Default terms & conditions" className="sm:col-span-3">
-                <textarea className="input" rows={4} value={s.invoice.terms} onChange={(e) => set("invoice", { terms: e.target.value })} />
+              <Field label="Terms (Modern format)" className="sm:col-span-3">
+                <textarea className="input" rows={3} value={s.invoice.terms} onChange={(e) => set("invoice", { terms: e.target.value })} />
               </Field>
             </div>
           </Card>
+          <Card title="Policies printed on the Aalat Travels invoice">
+            <div className="grid gap-3.5 sm:grid-cols-2">
+              <Field label="Cancellation policy" hint="One line per rule">
+                <textarea className="input" rows={5} value={s.invoice.cancellationPolicy} onChange={(e) => set("invoice", { cancellationPolicy: e.target.value })} />
+              </Field>
+              <Field label="Child policy" hint="One line per rule">
+                <textarea className="input" rows={5} value={s.invoice.childPolicy} onChange={(e) => set("invoice", { childPolicy: e.target.value })} />
+              </Field>
+              <Field label="Payment terms" hint="One line per step (numbered automatically)">
+                <textarea className="input" rows={4} value={s.invoice.paymentTerms} onChange={(e) => set("invoice", { paymentTerms: e.target.value })} />
+              </Field>
+              <Field label="Refund note">
+                <textarea className="input" rows={4} value={s.invoice.refundNote} onChange={(e) => set("invoice", { refundNote: e.target.value })} />
+              </Field>
+              <Field label="Footer line" className="sm:col-span-2">
+                <input className="input" value={s.invoice.footerNote} onChange={(e) => set("invoice", { footerNote: e.target.value })} />
+              </Field>
+            </div>
+          </Card>
+          </>
         )}
 
         {sec === "ai" && (
@@ -354,4 +427,26 @@ function Status({ ok, label, off }: { ok: boolean; label: string; off: string })
       {ok ? <Badge tone="leaf">Active</Badge> : <Badge>{off}</Badge>}
     </li>
   );
+}
+
+/** Downscales an uploaded logo to a small PNG data URL so it can be stored in settings. */
+function resizeImage(file: File, max: number): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const scale = Math.min(1, max / Math.max(img.width, img.height));
+      const c = document.createElement("canvas");
+      c.width = Math.round(img.width * scale);
+      c.height = Math.round(img.height * scale);
+      c.getContext("2d")!.drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url);
+      resolve(c.toDataURL("image/png"));
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("bad image"));
+    };
+    img.src = url;
+  });
 }

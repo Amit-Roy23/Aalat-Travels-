@@ -118,11 +118,31 @@ export const InvoiceItem = z.object({
   quantity: z.coerce.number().min(0.01, "Quantity must be greater than 0").max(10000),
   rate: z.coerce.number().min(0, "Rate cannot be negative").max(1e9),
 });
+export const TourInput = z
+  .object({
+    name: optStr(200),
+    duration: optStr(60),
+    adults: z.coerce.number().int().min(0).max(1000).default(0),
+    children: z.coerce.number().int().min(0).max(1000).default(0),
+    rooms: z.coerce.number().int().min(0).max(500).default(0),
+    startDate: z.union([z.literal(""), z.null(), z.coerce.date()]).optional(),
+    endDate: z.union([z.literal(""), z.null(), z.coerce.date()]).optional(),
+    startPoint: optStr(120),
+    endPoint: optStr(120),
+    foodPlan: optStr(80),
+    propertyType: optStr(80),
+    vehicleSeat: optStr(40),
+    vehicleType: optStr(80),
+  })
+  .refine((t) => !(t.startDate instanceof Date && t.endDate instanceof Date) || t.endDate >= t.startDate, { message: "Tour ending date cannot be before the starting date", path: ["endDate"] });
+
 export const InvoiceInput = z
   .object({
     customer: z.string().min(1, "Select a customer"),
     lead: z.string().optional().nullable(),
     tripTitle: optStr(200),
+    tour: TourInput.optional(),
+    taxType: z.enum(["cgst_sgst", "igst"]).optional(),
     issueDate: z.coerce.date(),
     dueDate: z.coerce.date(),
     items: z.array(InvoiceItem).min(1, "Add at least one line item"),

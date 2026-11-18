@@ -2,12 +2,13 @@
 import { use, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Ban, Copy, Download, IndianRupee, MessageCircle, Pencil, Send, Trash2, X } from "lucide-react";
+import { ArrowLeft, Ban, Copy, Printer, IndianRupee, MessageCircle, Pencil, Send, Trash2, X } from "lucide-react";
 import { api, useApi } from "@/lib/client";
 import { fmtDate, money, toDateInput, waLink } from "@/lib/format";
 import { PAYMENT_METHODS, paymentMethodLabel } from "@/lib/constants";
 import { Button, Card, ErrorState, Field, InvoiceStatusBadge, Modal, PageLoader, useUi } from "@/components/ui";
 import { InvoiceDocument, type CompanyData, type InvoiceDocData } from "@/components/invoice-doc";
+import { ClassicInvoice, type ClassicSettings } from "@/components/invoice-classic";
 import { useMe } from "@/components/session";
 
 type Inv = Omit<InvoiceDocData, "payments"> & {
@@ -18,7 +19,7 @@ type Inv = Omit<InvoiceDocData, "payments"> & {
   payments: { _id: string; amount: number; date: string; method: string; reference: string; note: string; recordedBy?: { _id: string; name: string } }[];
   createdBy?: { name: string };
 };
-type Res = { invoice: Inv; company: CompanyData; invoiceSettings: { bankDetails?: string; upiId?: string } };
+type Res = { invoice: Inv; company: CompanyData; invoiceSettings: ClassicSettings & { template?: "classic" | "modern" } };
 
 export default function InvoicePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -27,9 +28,11 @@ export default function InvoicePage({ params }: { params: Promise<{ id: string }
   const { toast, confirm } = useUi();
   const { data, error, mutate } = useApi<Res>(`/api/invoices/${id}`);
   const [pay, setPay] = useState(false);
+  const [view, setView] = useState<"classic" | "modern" | null>(null);
   if (error) return <ErrorState error={error} retry={() => mutate()} />;
   if (!data) return <PageLoader />;
   const inv = data.invoice;
+  const template = view ?? data.invoiceSettings.template ?? "classic";
   const publicUrl = typeof window !== "undefined" ? `${window.location.origin}/i/${inv.shareToken}` : "";
   const shareText = `Hello ${inv.customer.name.split(" ")[0]}, here is your invoice ${inv.number} from ${data.company.name} for ${money(inv.total)}${inv.balance > 0 ? ` (balance due ${money(inv.balance)} by ${fmtDate(inv.dueDate)})` : ""}.\n\nView / download: ${publicUrl}`;
 
@@ -100,8 +103,8 @@ export default function InvoicePage({ params }: { params: Promise<{ id: string }
               Record payment
             </Button>
           )}
-          <Button size="sm" variant="outline" icon={<Download className="h-4 w-4" />} onClick={() => window.print()}>
-            Download PDF
+          <Button size="sm" variant="outline" icon={<Printer className="h-4 w-4" />} onClick={() => window.open(`/print/invoice/${id}?t=${template}`, "_blank")}>
+            Print / PDF
           </Button>
           {inv.state === "issued" && (
             <>
@@ -135,8 +138,26 @@ export default function InvoicePage({ params }: { params: Promise<{ id: string }
         </div>
       </div>
 
+      <div className="no-print mb-3 flex flex-wrap items-center gap-2">
+        <span className="text-xs font-semibold text-muted">Invoice format:</span>
+        <div className="flex rounded-xl bg-surface-2 p-1">
+          {(
+            [
+              ["classic", "Aalat Travels format"],
+              ["modern", "Modern"],
+            ] as const
+          ).map(([v, l]) => (
+            <button key={v} onClick={() => setView(v)} className={`rounded-lg px-3 py-1.5 text-[13px] font-semibold ${template === v ? "bg-surface shadow-card" : "text-muted"}`}>
+              {l}
+            </button>
+          ))}
+        </div>
+        <span className="text-xs text-muted">Print / PDF uses the format shown. Set the default in Settings → Invoices.</span>
+      </div>
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
-        <InvoiceDocument inv={inv} company={data.company} bank={data.invoiceSettings} />
+        <div className="min-w-0 overflow-x-auto">
+          {template === "classic" ? <ClassicInvoice inv={inv} company={data.company} settings={data.invoiceSettings} /> : <InvoiceDocument inv={inv} company={data.company} bank={data.invoiceSettings} />}
+        </div>
         <div className="no-print space-y-4">
           <Card title="Payment status">
             <div className="mb-3 h-2.5 overflow-hidden rounded-full bg-surface-2">

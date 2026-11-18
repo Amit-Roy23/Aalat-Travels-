@@ -180,9 +180,22 @@ body {
     inset: 0 auto auto 0;
     width: 100%;
     box-shadow: none !important;
+  }
+  .print-area:not(.classic-invoice) {
     border: 0 !important;
   }
   @page {
-    margin: 12mm;
+    size: A4;
+    margin: 8mm;
+  }
+  .print-area,
+  .print-area * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .classic-invoice {
+    max-width: none !important;
+    font-size: 12px !important;
+    break-inside: avoid;
   }
 }
