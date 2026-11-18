@@ -41,7 +41,13 @@ check "due before issue rejected" $(code -d "{\"customer\":\"$CID\",\"issueDate\
 INV=$(req -d "{\"customer\":\"$CID\",\"issueDate\":\"$TODAY\",\"dueDate\":\"$NEXT\",\"items\":[{\"description\":\"Goa pkg\",\"quantity\":2,\"rate\":14999},{\"description\":\"Transfers\",\"quantity\":1,\"rate\":2500}],\"discount\":1000,\"taxRate\":5}" $B/api/invoices)
 IID=$(echo "$INV" | jq_ "d['invoice']['_id']")
 check "invoice total = (29998+2500-1000)*1.05 = 33072.9" $(echo "$INV" | jq_ "d['invoice']['total']") 33072.9
-check "invoice number format" $(echo "$INV" | jq_ "__import__('re').match(r'^[A-Z0-9]+-\d{4}-\d{4}$', d['invoice']['number']) is not None") True
+check "invoice number is plain sequence" $(echo "$INV" | jq_ "d['invoice']['number'].isdigit()") True
+N1=$(echo "$INV" | jq_ "int(d['invoice']['number'])")
+check "tour end before start rejected" $(code -d "{\"customer\":\"$CID\",\"issueDate\":\"$TODAY\",\"dueDate\":\"$NEXT\",\"tour\":{\"name\":\"X\",\"startDate\":\"$NEXT\",\"endDate\":\"$TODAY\"},\"items\":[{\"description\":\"Pkg\",\"quantity\":1,\"rate\":100}]}" $B/api/invoices) 400
+INV2=$(req -d "{\"customer\":\"$CID\",\"issueDate\":\"$TODAY\",\"dueDate\":\"$NEXT\",\"state\":\"draft\",\"taxType\":\"igst\",\"tour\":{\"name\":\"Goa Beach Escape\",\"duration\":\"4N/5D\",\"adults\":2,\"rooms\":1,\"startDate\":\"$NEXT\",\"endDate\":\"$NEXT\",\"foodPlan\":\"CP (Breakfast)\"},\"items\":[{\"description\":\"Pkg\",\"quantity\":1,\"rate\":100}]}" $B/api/invoices)
+check "next number = previous + 1" $(echo "$INV2" | jq_ "int(d['invoice']['number'])") $((N1+1))
+check "tour details + IGST saved" $(echo "$INV2" | jq_ "d['invoice']['tour']['name'].replace(' ','_')+'/'+str(d['invoice']['tour']['adults'])+'/'+d['invoice']['taxType']") Goa_Beach_Escape/2/igst
+check "draft deleted" $(code -X DELETE $B/api/invoices/$(echo "$INV2" | jq_ "d['invoice']['_id']")) 200
 check "overpayment rejected" $(code -d "{\"amount\":40000,\"date\":\"$TODAY\",\"method\":\"upi\"}" $B/api/invoices/$IID/payments) 400
 check "partial payment" $(req -d "{\"amount\":10000,\"date\":\"$TODAY\",\"method\":\"upi\"}" $B/api/invoices/$IID/payments | jq_ "d['invoice']['status']") partial
 check "cancel with payments blocked" $(code -X PATCH -d '{"state":"cancelled"}' $B/api/invoices/$IID) 400

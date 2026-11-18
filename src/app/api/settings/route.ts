@@ -28,8 +28,8 @@ export const GET = route(async (req) => {
 
 const s = (max = 2000) => z.string().max(max);
 const Schema = z.object({
-  company: z.object({ name: s(80).min(2), tagline: s(120), phone: s(30), email: s(120), website: s(200), address: s(400), gstin: s(20) }).partial().optional(),
-  invoice: z.object({ prefix: z.string().trim().regex(/^[A-Z0-9]{2,8}$/i, "Prefix must be 2–8 letters/numbers").transform((v) => v.toUpperCase()), defaultTaxRate: z.coerce.number().min(0).max(100), dueDays: z.coerce.number().int().min(0).max(365), terms: s(4000), bankDetails: s(1000), upiId: s(100) }).partial().optional(),
+  company: z.object({ name: s(80).min(2), tagline: s(120), phone: s(80), email: s(120), website: s(200), address: s(400), gstin: s(20), regNo: s(60), logo: z.union([z.literal(""), z.string().max(400_000).regex(/^data:image\/(png|jpeg|webp);base64,/, "Logo must be a PNG, JPG or WebP image")]) }).partial().optional(),
+  invoice: z.object({ template: z.enum(["classic", "modern"]), numberStyle: z.enum(["plain", "prefixed"]), startNumber: z.coerce.number().int().min(1).max(1e9), taxType: z.enum(["cgst_sgst", "igst"]), cancellationPolicy: s(3000), childPolicy: s(3000), paymentTerms: s(3000), refundNote: s(3000), footerNote: s(300), prefix: z.string().trim().regex(/^[A-Z0-9]{2,8}$/i, "Prefix must be 2–8 letters/numbers").transform((v) => v.toUpperCase()), defaultTaxRate: z.coerce.number().min(0).max(100), dueDays: z.coerce.number().int().min(0).max(365), terms: s(4000), bankDetails: s(1000), upiId: s(100) }).partial().optional(),
   ai: z
     .object({
       enabled: z.boolean(),

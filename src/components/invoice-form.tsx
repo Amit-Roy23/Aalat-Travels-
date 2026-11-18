@@ -6,6 +6,7 @@ import { api, useApi } from "@/lib/client";
 import { money, round2, toDateInput } from "@/lib/format";
 import { Button, Card, Field, useUi } from "./ui";
 import { EntityPicker } from "./forms";
+import { FOOD_PLANS, PROPERTY_TYPES, VEHICLE_TYPES } from "@/lib/invoice-defaults";
 
 type Item = { description: string; quantity: string; rate: string };
 export type InvoiceInit = {
@@ -23,9 +24,15 @@ export type InvoiceInit = {
   terms?: string;
   state?: string;
   amountPaid?: number;
+  taxType?: string;
+  tour?: { name?: string; duration?: string; adults?: number; children?: number; rooms?: number; startDate?: string; endDate?: string; startPoint?: string; endPoint?: string; foodPlan?: string; propertyType?: string; vehicleSeat?: string; vehicleType?: string };
 };
 
-type SettingsRes = { settings: { invoice: { defaultTaxRate: number; dueDays: number; terms: string }; ai: { packages: { name: string; duration: string; pricePerPerson: number }[] } } };
+const blankTour = { name: "", duration: "", adults: "", children: "", rooms: "", startDate: "", endDate: "", startPoint: "", endPoint: "", foodPlan: "", propertyType: "", vehicleSeat: "", vehicleType: "" };
+type Tour = typeof blankTour;
+type CustLeads = { leads: { _id: string; destination: string; travelDate: string; status: string; travellers: { adults: number; children: number } }[] };
+
+type SettingsRes = { settings: { invoice: { defaultTaxRate: number; dueDays: number; terms: string; taxType: string }; ai: { packages: { name: string; duration: string; pricePerPerson: number }[] } } };
 
 export function InvoiceForm({ init, presetCustomer }: { init?: InvoiceInit; presetCustomer?: { id: string; name: string; phone?: string } | null }) {
   const router = useRouter();
@@ -46,8 +53,53 @@ export function InvoiceForm({ init, presetCustomer }: { init?: InvoiceInit; pres
     terms: init?.terms ?? "",
   });
   const [items, setItems] = useState<Item[]>(init?.items?.map((i) => ({ description: i.description, quantity: String(i.quantity), rate: String(i.rate) })) ?? [{ description: "", quantity: "1", rate: "" }]);
+  const it = init?.tour;
+  const [tour, setTour] = useState<Tour>(
+    it
+      ? {
+          name: it.name ?? "",
+          duration: it.duration ?? "",
+          adults: it.adults ? String(it.adults) : "",
+          children: it.children ? String(it.children) : "",
+          rooms: it.rooms ? String(it.rooms) : "",
+          startDate: it.startDate ? toDateInput(it.startDate) : "",
+          endDate: it.endDate ? toDateInput(it.endDate) : "",
+          startPoint: it.startPoint ?? "",
+          endPoint: it.endPoint ?? "",
+          foodPlan: it.foodPlan ?? "",
+          propertyType: it.propertyType ?? "",
+          vehicleSeat: it.vehicleSeat ?? "",
+          vehicleType: it.vehicleType ?? "",
+        }
+      : blankTour,
+  );
+  const [taxType, setTaxType] = useState(init?.taxType ?? "");
+  const [leadId, setLeadId] = useState<string>(typeof init?.lead === "string" ? init.lead : (init?.lead?._id ?? ""));
+  const { data: custData } = useApi<CustLeads>(!editing && customer ? `/api/customers/${customer.id}` : null);
+  const setT = (k: keyof Tour) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setTour((p) => ({ ...p, [k]: e.target.value }));
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState<"" | "draft" | "issued">("");
+
+  const fillFromLead = (id: string) => {
+    setLeadId(id);
+    const l = custData?.leads.find((x) => x._id === id);
+    if (!l) return;
+    const pkg = st?.settings.ai.packages.find((p) => p.name && l.destination && p.name.toLowerCase().includes(l.destination.toLowerCase()));
+    setTour((p) => ({
+      ...p,
+      name: p.name || pkg?.name || (l.destination ? `${l.destination} Tour` : ""),
+      duration: p.duration || pkg?.duration || "",
+      adults: p.adults || (l.travellers?.adults ? String(l.travellers.adults) : ""),
+      children: p.children || (l.travellers?.children ? String(l.travellers.children) : ""),
+      rooms: p.rooms || (l.travellers?.adults ? String(Math.max(1, Math.ceil(l.travellers.adults / 2))) : ""),
+    }));
+    if (pkg && !items.some((x) => x.description || x.rate)) {
+      setItems([
+        { description: `${pkg.name} (${pkg.duration}) — adults, twin sharing`, quantity: String(l.travellers?.adults || 2), rate: String(pkg.pricePerPerson) },
+        ...(l.travellers?.children ? [{ description: `${pkg.name} — child`, quantity: String(l.travellers.children), rate: String(Math.round(pkg.pricePerPerson * 0.7)) }] : []),
+      ]);
+    }
+  };
 
   useEffect(() => {
     if (!st || editing) return;
@@ -57,6 +109,7 @@ export function InvoiceForm({ init, presetCustomer }: { init?: InvoiceInit; pres
       terms: p.terms || st.settings.invoice.terms || "",
       dueDate: p.dueDate || toDateInput(new Date(Date.now() + (st.settings.invoice.dueDays ?? 7) * 86400000)),
     }));
+    setTaxType((t) => t || st.settings.invoice.taxType || "cgst_sgst");
   }, [st, editing]);
 
   const totals = useMemo(() => {
@@ -73,6 +126,7 @@ export function InvoiceForm({ init, presetCustomer }: { init?: InvoiceInit; pres
     if (!p) return;
     setItems((arr) => [...arr.filter((x) => x.description || x.rate), { description: `${p.name} (${p.duration}) — per person, twin sharing`, quantity: "2", rate: String(p.pricePerPerson) }]);
     if (!f.tripTitle) setF((x) => ({ ...x, tripTitle: p.name }));
+    setTour((t) => ({ ...t, name: t.name || p.name, duration: t.duration || p.duration }));
   };
 
   const save = async (state: "draft" | "issued") => {
@@ -84,11 +138,21 @@ export function InvoiceForm({ init, presetCustomer }: { init?: InvoiceInit; pres
     if (clean.some((i) => !(Number(i.quantity) > 0))) return setErr("Quantities must be greater than 0.");
     if (totals.total <= 0) return setErr("Invoice total must be greater than zero.");
     if (f.dueDate < f.issueDate) return setErr("Due date cannot be before the issue date.");
+    if (tour.startDate && tour.endDate && tour.endDate < tour.startDate) return setErr("Tour ending date cannot be before the starting date.");
     if (editing && init?.amountPaid && totals.total < init.amountPaid) return setErr(`Total cannot be less than the ${money(init.amountPaid)} already paid.`);
     setBusy(state);
     try {
       const body = {
-        tripTitle: f.tripTitle,
+        tripTitle: f.tripTitle || tour.name,
+        taxType: taxType || "cgst_sgst",
+        tour: {
+          ...tour,
+          adults: Number(tour.adults) || 0,
+          children: Number(tour.children) || 0,
+          rooms: Number(tour.rooms) || 0,
+          startDate: tour.startDate || null,
+          endDate: tour.endDate || null,
+        },
         issueDate: f.issueDate,
         dueDate: f.dueDate,
         items: clean.map((i) => ({ description: i.description.trim(), quantity: Number(i.quantity), rate: Number(i.rate) || 0 })),
@@ -101,7 +165,7 @@ export function InvoiceForm({ init, presetCustomer }: { init?: InvoiceInit; pres
       if (editing) {
         await api(`/api/invoices/${id}`, { method: "PATCH", body: { ...body, ...(init?.state === "draft" && state === "issued" ? { state: "issued" } : {}) } });
       } else {
-        const r = await api<{ invoice: { _id: string } }>("/api/invoices", { body: { ...body, customer: customer.id, state } });
+        const r = await api<{ invoice: { _id: string } }>("/api/invoices", { body: { ...body, customer: customer.id, lead: leadId || undefined, state } });
         id = r.invoice._id;
       }
       toast(editing ? "Invoice updated" : state === "draft" ? "Draft saved" : "Invoice created");
@@ -131,6 +195,68 @@ export function InvoiceForm({ init, presetCustomer }: { init?: InvoiceInit; pres
               <input className="input" type="date" value={f.dueDate} min={f.issueDate} onChange={(e) => setF({ ...f, dueDate: e.target.value })} />
             </Field>
           </div>
+        </Card>
+        <Card
+          title="Tour details"
+          action={
+            !editing && !!custData?.leads.length && (
+              <select className="input h-8 w-auto max-w-[220px] text-xs" value={leadId} onChange={(e) => fillFromLead(e.target.value)} aria-label="Fill from enquiry">
+                <option value="">Fill from enquiry…</option>
+                {custData.leads.map((l) => (
+                  <option key={l._id} value={l._id}>
+                    {l.destination || "Enquiry"} {l.travelDate && `· ${l.travelDate}`}
+                  </option>
+                ))}
+              </select>
+            )
+          }
+        >
+          <div className="grid gap-3.5 sm:grid-cols-2">
+            <Field label="Name of tour">
+              <input className="input" value={tour.name} onChange={setT("name")} placeholder="e.g. Kashmir Paradise" />
+            </Field>
+            <Field label="Duration">
+              <input className="input" value={tour.duration} onChange={setT("duration")} placeholder="5 Nights / 6 Days" />
+            </Field>
+            <div className="grid grid-cols-3 gap-3 sm:col-span-2">
+              <Field label="Adults">
+                <input className="input" type="number" min={0} value={tour.adults} onChange={setT("adults")} />
+              </Field>
+              <Field label="Children">
+                <input className="input" type="number" min={0} value={tour.children} onChange={setT("children")} />
+              </Field>
+              <Field label="Rooms">
+                <input className="input" type="number" min={0} value={tour.rooms} onChange={setT("rooms")} />
+              </Field>
+            </div>
+            <Field label="Starting date">
+              <input className="input" type="date" value={tour.startDate} onChange={setT("startDate")} />
+            </Field>
+            <Field label="Ending date">
+              <input className="input" type="date" value={tour.endDate} min={tour.startDate || undefined} onChange={setT("endDate")} />
+            </Field>
+            <Field label="Starting point">
+              <input className="input" value={tour.startPoint} onChange={setT("startPoint")} placeholder="e.g. Srinagar Airport" />
+            </Field>
+            <Field label="Ending point">
+              <input className="input" value={tour.endPoint} onChange={setT("endPoint")} placeholder="e.g. Srinagar Airport" />
+            </Field>
+            <Field label="Food plan">
+              <input className="input" list="food-plans" value={tour.foodPlan} onChange={setT("foodPlan")} placeholder="MAP (Breakfast + Dinner)" />
+            </Field>
+            <Field label="Property type">
+              <input className="input" list="property-types" value={tour.propertyType} onChange={setT("propertyType")} placeholder="Hotel / Resort" />
+            </Field>
+            <Field label="Vehicle seat">
+              <input className="input" value={tour.vehicleSeat} onChange={setT("vehicleSeat")} placeholder="e.g. 7 Seater" />
+            </Field>
+            <Field label="Vehicle type">
+              <input className="input" list="vehicle-types" value={tour.vehicleType} onChange={setT("vehicleType")} placeholder="SUV (Innova / Ertiga)" />
+            </Field>
+          </div>
+          <datalist id="food-plans">{FOOD_PLANS.map((x) => <option key={x} value={x} />)}</datalist>
+          <datalist id="property-types">{PROPERTY_TYPES.map((x) => <option key={x} value={x} />)}</datalist>
+          <datalist id="vehicle-types">{VEHICLE_TYPES.map((x) => <option key={x} value={x} />)}</datalist>
         </Card>
         <Card
           title="Line items"
@@ -197,13 +323,33 @@ export function InvoiceForm({ init, presetCustomer }: { init?: InvoiceInit; pres
               <span className="text-muted">GST %</span>
               <input className="input h-8 w-28 text-right" type="number" min={0} max={100} step="0.01" value={f.taxRate} onChange={(e) => setF({ ...f, taxRate: e.target.value })} aria-label="Tax rate" />
             </div>
-            <div className="flex justify-between">
-              <span className="text-muted">GST amount</span>
-              <span className="tabular-nums">{money(totals.tax)}</span>
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-muted">GST type</span>
+              <select className="input h-8 w-40 text-xs" value={taxType || "cgst_sgst"} onChange={(e) => setTaxType(e.target.value)} aria-label="GST type">
+                <option value="cgst_sgst">CGST + SGST (in-state)</option>
+                <option value="igst">IGST (other state)</option>
+              </select>
             </div>
+            {(taxType || "cgst_sgst") === "cgst_sgst" ? (
+              <>
+                <div className="flex justify-between">
+                  <span className="text-muted">CGST ({(Number(f.taxRate) || 0) / 2}%)</span>
+                  <span className="tabular-nums">{money(round2(totals.tax / 2))}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted">SGST ({(Number(f.taxRate) || 0) / 2}%)</span>
+                  <span className="tabular-nums">{money(round2(totals.tax - round2(totals.tax / 2)))}</span>
+                </div>
+              </>
+            ) : (
+              <div className="flex justify-between">
+                <span className="text-muted">IGST ({Number(f.taxRate) || 0}%)</span>
+                <span className="tabular-nums">{money(totals.tax)}</span>
+              </div>
+            )}
             <div className="perforation my-1" />
             <div className="flex items-baseline justify-between">
-              <span className="font-semibold">Total</span>
+              <span className="font-semibold">Grand total</span>
               <span className="font-display text-2xl font-extrabold tabular-nums">{money(totals.total)}</span>
             </div>
             {editing && !!init?.amountPaid && <p className="text-xs text-muted">Already paid: {money(init.amountPaid)}</p>}

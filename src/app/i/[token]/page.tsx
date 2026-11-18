@@ -2,8 +2,9 @@
 import { use, useEffect, useState } from "react";
 import { Download } from "lucide-react";
 import { InvoiceDocument, type CompanyData, type InvoiceDocData } from "@/components/invoice-doc";
+import { ClassicInvoice, type ClassicSettings } from "@/components/invoice-classic";
 
-type Res = { invoice: InvoiceDocData; company: CompanyData; invoiceSettings: { bankDetails?: string; upiId?: string } };
+type Res = { invoice: InvoiceDocData; company: CompanyData; invoiceSettings: ClassicSettings & { template?: string } };
 
 export default function PublicInvoice({ params }: { params: Promise<{ token: string }> }) {
   const { token } = use(params);
@@ -25,10 +26,10 @@ export default function PublicInvoice({ params }: { params: Promise<{ token: str
     <div className="mx-auto max-w-4xl px-4 py-6 sm:py-10">
       <div className="no-print mb-4 flex justify-end">
         <button onClick={() => window.print()} className="inline-flex items-center gap-2 rounded-xl bg-[#0E8F80] px-4 py-2.5 text-sm font-semibold text-white">
-          <Download className="h-4 w-4" /> Download PDF
+          <Download className="h-4 w-4" /> Print / Download PDF
         </button>
       </div>
-      <InvoiceDocument inv={data.invoice} company={data.company} bank={data.invoiceSettings} />
+      {data.invoiceSettings.template === "modern" ? <InvoiceDocument inv={data.invoice} company={data.company} bank={data.invoiceSettings} /> : <ClassicInvoice inv={data.invoice} company={data.company} settings={data.invoiceSettings} />}
       <p className="no-print mt-6 text-center text-xs text-muted">Questions about this invoice? Reply on WhatsApp or contact {data.company.phone || data.company.email || data.company.name}.</p>
     </div>
   );

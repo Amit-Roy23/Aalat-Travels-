@@ -304,6 +304,34 @@ function PasswordModal({ open, onClose }: { open: boolean; onClose: () => void }
 function Notifications() {
   const { data, mutate } = useApi<Notif>("/api/notifications", { refreshInterval: 45000 });
   const router = useRouter();
+  const [perm, setPerm] = useState<NotificationPermission | "unsupported">("unsupported");
+  const seen = useRef<Set<string> | null>(null);
+  useEffect(() => setPerm(typeof window !== "undefined" && "Notification" in window ? Notification.permission : "unsupported"), []);
+  // Desktop alerts for new notifications and follow-ups that become due (only for items that appear after page load)
+  useEffect(() => {
+    if (!data) return;
+    const items = [
+      ...data.reminders.map((r) => ({ id: "r" + r._id, title: `⏰ Follow-up due: ${r.title}`, body: r.lead?.name ?? r.customer?.name ?? "", link: "/follow-ups" })),
+      ...data.items.filter((n) => !n.read).map((n) => ({ id: "n" + n._id, title: n.title, body: n.body, link: n.link })),
+    ];
+    if (!seen.current) {
+      seen.current = new Set(items.map((i) => i.id));
+      return;
+    }
+    for (const i of items) {
+      if (seen.current.has(i.id)) continue;
+      seen.current.add(i.id);
+      if (perm === "granted") {
+        try {
+          const n = new Notification(i.title, { body: i.body, icon: "/icon.svg", tag: i.id });
+          n.onclick = () => {
+            window.focus();
+            if (i.link) router.push(i.link);
+          };
+        } catch {}
+      }
+    }
+  }, [data, perm, router]);
   const count = (data?.unread ?? 0) + (data?.reminders.length ?? 0);
   const markAll = async () => {
     await api("/api/notifications", { body: {} });
@@ -328,6 +356,11 @@ function Notifications() {
               </button>
             )}
           </div>
+          {perm === "default" && (
+            <button onClick={async () => setPerm(await Notification.requestPermission())} className="mx-1 mb-1.5 flex w-[calc(100%-0.5rem)] items-center gap-2 rounded-xl bg-brand-soft px-3 py-2 text-left text-xs font-semibold text-brand-ink">
+              <Bell className="h-3.5 w-3.5" /> Enable desktop alerts for reminders & new leads
+            </button>
+          )}
           <div className="scrollbar-thin max-h-[60vh] overflow-y-auto">
             {data?.reminders.map((r) => (
               <button key={r._id} onClick={() => (close(), router.push("/follow-ups"))} className="flex w-full gap-3 rounded-xl bg-sun-soft/60 px-3 py-2.5 text-left hover:bg-sun-soft">

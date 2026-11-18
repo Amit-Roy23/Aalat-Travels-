@@ -18,10 +18,12 @@ export type InvoiceDocData = {
   status: string;
   notes?: string;
   terms?: string;
-  customer: { name: string; phone?: string; email?: string; address?: string; city?: string; gstin?: string };
+  customer: { name: string; phone?: string; altPhone?: string; email?: string; address?: string; city?: string; gstin?: string };
   payments?: { amount: number; date: string; method: string }[];
+  taxType?: string;
+  tour?: { name?: string; duration?: string; adults?: number; children?: number; rooms?: number; startDate?: string; endDate?: string; startPoint?: string; endPoint?: string; foodPlan?: string; propertyType?: string; vehicleSeat?: string; vehicleType?: string };
 };
-export type CompanyData = { name?: string; tagline?: string; phone?: string; email?: string; website?: string; address?: string; gstin?: string };
+export type CompanyData = { name?: string; tagline?: string; phone?: string; email?: string; website?: string; address?: string; gstin?: string; regNo?: string; logo?: string };
 
 const stampTone: Record<string, string> = { paid: "border-leaf text-leaf", overdue: "border-coral text-coral", partial: "border-sun text-sun", sent: "border-sky text-sky", draft: "border-slate2 text-slate2", cancelled: "border-slate2 text-slate2" };
 
@@ -32,7 +34,7 @@ export function InvoiceDocument({ inv, company, bank, className }: { inv: Invoic
         <div className="absolute -right-10 -top-16 h-48 w-48 rounded-full bg-[#2CC2AE]/20 blur-2xl" />
         <div className="relative flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex items-center gap-3">
-            <LogoMark className="h-12 w-12" />
+            {company.logo ? <img src={company.logo} alt="" className="h-12 w-12 rounded-full bg-white object-contain" /> : <LogoMark className="h-12 w-12" />}
             <div>
               <p className="font-display text-2xl font-extrabold tracking-tight">{company.name || "Aalat Travels"}</p>
               {company.tagline && <p className="text-sm text-white/60">{company.tagline}</p>}
@@ -95,13 +97,31 @@ export function InvoiceDocument({ inv, company, bank, className }: { inv: Invoic
             <p className="whitespace-pre-line text-sm text-[#52575f]">
               {[company.address, company.phone, company.email, company.website].filter(Boolean).join("\n")}
               {company.gstin && `\nGSTIN: ${company.gstin}`}
+              {company.regNo && `\nReg No.: ${company.regNo}`}
             </p>
           </div>
         </div>
-        {inv.tripTitle && (
-          <p className="mt-6 rounded-xl bg-[#F1EEE7] px-4 py-2.5 text-sm">
-            <span className="font-semibold">Trip:</span> {inv.tripTitle}
-          </p>
+        {(inv.tripTitle || inv.tour?.name) && (
+          <div className="mt-6 rounded-xl bg-[#F1EEE7] px-4 py-2.5 text-sm">
+            <p>
+              <span className="font-semibold">Tour:</span> {inv.tour?.name || inv.tripTitle}
+              {inv.tour?.duration && ` · ${inv.tour.duration}`}
+            </p>
+            {inv.tour && (inv.tour.startDate || inv.tour.adults) && (
+              <p className="mt-0.5 text-[13px] text-[#52575f]">
+                {[
+                  inv.tour.startDate && `${fmtDate(inv.tour.startDate)}${inv.tour.endDate ? ` – ${fmtDate(inv.tour.endDate)}` : ""}`,
+                  inv.tour.adults ? `${inv.tour.adults} adult${inv.tour.adults > 1 ? "s" : ""}${inv.tour.children ? ` + ${inv.tour.children} child${inv.tour.children > 1 ? "ren" : ""}` : ""}` : "",
+                  inv.tour.rooms ? `${inv.tour.rooms} room${inv.tour.rooms > 1 ? "s" : ""}` : "",
+                  inv.tour.foodPlan,
+                  inv.tour.propertyType,
+                  inv.tour.vehicleType,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </p>
+            )}
+          </div>
         )}
         <div className="mt-6 overflow-x-auto">
           <table className="w-full min-w-[420px] text-sm">
@@ -140,10 +160,23 @@ export function InvoiceDocument({ inv, company, bank, className }: { inv: Invoic
                 <dd className="tabular-nums">− {money(inv.discount)}</dd>
               </div>
             )}
-            <div className="flex justify-between">
-              <dt className="text-[#6b7078]">GST ({inv.taxRate}%)</dt>
-              <dd className="tabular-nums">{money(inv.taxAmount)}</dd>
-            </div>
+            {inv.taxType === "igst" ? (
+              <div className="flex justify-between">
+                <dt className="text-[#6b7078]">IGST ({inv.taxRate}%)</dt>
+                <dd className="tabular-nums">{money(inv.taxAmount)}</dd>
+              </div>
+            ) : (
+              <>
+                <div className="flex justify-between">
+                  <dt className="text-[#6b7078]">CGST ({inv.taxRate / 2}%)</dt>
+                  <dd className="tabular-nums">{money(Math.round((inv.taxAmount / 2) * 100) / 100)}</dd>
+                </div>
+                <div className="flex justify-between">
+                  <dt className="text-[#6b7078]">SGST ({inv.taxRate / 2}%)</dt>
+                  <dd className="tabular-nums">{money(inv.taxAmount - Math.round((inv.taxAmount / 2) * 100) / 100)}</dd>
+                </div>
+              </>
+            )}
             <div className="flex justify-between border-t-2 border-[#13202E] pt-2 text-base font-bold">
               <dt>Total</dt>
               <dd className="tabular-nums">{money(inv.total)}</dd>

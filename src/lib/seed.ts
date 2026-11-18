@@ -33,6 +33,18 @@ const DESTS: { d: string; price: number; pkg: string }[] = [
   { d: "Thailand", price: 39999, pkg: "Thailand Fun Tour (5N/6D)" },
   { d: "Rajasthan", price: 22999, pkg: "Royal Rajasthan (6N/7D)" },
 ];
+const POINTS: Record<string, [string, string]> = {
+  Goa: ["Goa Airport (GOI)", "Goa Airport (GOI)"],
+  Kashmir: ["Srinagar Airport", "Srinagar Airport"],
+  Kerala: ["Kochi Airport (COK)", "Trivandrum Airport"],
+  Manali: ["Delhi (Volvo pickup)", "Delhi (Volvo drop)"],
+  Darjeeling: ["NJP / Bagdogra", "NJP / Bagdogra"],
+  Dubai: ["Kolkata Airport (CCU)", "Kolkata Airport (CCU)"],
+  Bali: ["Kolkata Airport (CCU)", "Kolkata Airport (CCU)"],
+  Maldives: ["Kolkata Airport (CCU)", "Kolkata Airport (CCU)"],
+  Thailand: ["Kolkata Airport (CCU)", "Kolkata Airport (CCU)"],
+  Rajasthan: ["Jaipur Airport", "Udaipur Airport"],
+};
 const SOURCES: LeadSource[] = ["meta_ads", "meta_ads", "meta_ads", "google_ads", "google_ads", "whatsapp", "whatsapp", "website", "referral", "walk_in", "phone_call"];
 const MONTHS = ["December", "January", "February", "March", "April", "May", "June", "October", "November"];
 const NOTES = [
@@ -176,10 +188,32 @@ export async function seedDemo(adminId?: string) {
     const amountPaid = round2(payments.reduce((s, p) => s + (p.amount as number), 0));
     const state = plan === "draft" ? "draft" : "issued";
     invDocs.push({
-      number: await nextInvoiceNumber(settings.invoice?.prefix || "AAL", issueDate),
+      number: await nextInvoiceNumber({ style: settings.invoice?.numberStyle, prefix: settings.invoice?.prefix, startNumber: settings.invoice?.startNumber }, issueDate),
       customer: c._id,
       lead: lead._id,
-      tripTitle: `${lead.destination} trip · ${lead.travelDate}`,
+      tripTitle: `${dest.pkg.replace(/ \(.*\)$/, "")}`,
+      tour: (() => {
+        const m = dest.pkg.match(/\((\d+)N\/(\d+)D\)/);
+        const nights = m ? +m[1] : 4;
+        const start = new Date(issueDate.getTime() + (12 + (i % 5) * 9) * D);
+        start.setHours(0, 0, 0, 0);
+        const pts = POINTS[dest.d] ?? ["Pickup point", "Drop point"];
+        return {
+          name: dest.pkg.replace(/ \(.*\)$/, ""),
+          duration: m ? `${nights} Nights / ${m[2]} Days` : "",
+          adults,
+          children,
+          rooms: Math.max(1, Math.ceil(adults / 2)),
+          startDate: start,
+          endDate: new Date(start.getTime() + nights * D),
+          startPoint: pts[0],
+          endPoint: pts[1],
+          foodPlan: ["CP (Breakfast)", "MAP (Breakfast + Dinner)", "MAP (Breakfast + Dinner)", "AP (All meals)"][i % 4],
+          propertyType: dest.d === "Kashmir" ? "Hotel + Houseboat" : dest.d === "Maldives" ? "Resort" : ["Hotel", "Resort", "Hotel"][i % 3],
+          vehicleSeat: adults + children > 4 ? "7 Seater" : "4 Seater",
+          vehicleType: adults + children > 4 ? "SUV (Innova / Ertiga)" : "Sedan (Dzire / Etios)",
+        };
+      })(),
       issueDate,
       dueDate,
       ...totals,

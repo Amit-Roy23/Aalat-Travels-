@@ -17,7 +17,7 @@ Built with **Next.js 15 (App Router) · TypeScript · MongoDB (Mongoose) · Tail
 | **Follow-ups** | Overdue / Today / Upcoming / Done, call/WhatsApp/email/meeting types, snooze, complete with an outcome (and update the lead status in the same step), reminders in the notification bell |
 | **WhatsApp Inbox** | Shared inbox with AI on/off per chat, human hand-over alerts, agent replies (AI pauses automatically), the 24-hour-window warning, and lead details beside the chat |
 | **AI Chat Demos** | 7 animated showcase conversations (Hindi, English, Hinglish, Bengali, Arabic, Spanish, opt-out) with a live CRM panel, and a **live sandbox** where you chat as a customer through the real automation pipeline |
-| **Invoices** | Auto-numbered GST invoices (`AAL-2026-0001`), line items, discount, tax, drafts, partial payments, balance & overdue tracking, PDF download, public share link and WhatsApp share |
+| **Invoices** | Prints in **Aalat Travels' own invoice format** (crimson layout from their invoice book: customer, tour and payment details, CGST/SGST, cancellation/child policy, payment terms, signatures) on one A4 page, or a modern layout. Sequential numbers (e.g. 2953, continuing the paper book), tour details, packages, discounts, drafts, advance/part payments, balance & overdue tracking, Print / Save as PDF, public share link and WhatsApp share |
 | **Reports** | Conversion funnel, source performance, team performance, revenue billed vs collected, top destinations, customer languages, AI automation stats |
 | **Team & roles** | Admins see everything; sales agents see only the leads & follow-ups assigned to them |
 | **Settings** | Company profile, invoice defaults (prefix, GST, bank/UPI), AI knowledge base (packages, FAQs, policies, tone), automation toggles, webhook URLs, API key, demo data |
@@ -120,6 +120,13 @@ src/
     seed.ts           demo data
     demo-scenarios.ts scripted showcase conversations
 ```
+
+## Requirements checklist
+See [`docs/REQUIREMENTS_CHECKLIST.md`](docs/REQUIREMENTS_CHECKLIST.md) for every quotation item mapped to the feature that delivers it.
+
+## Before going live
+- **Settings → Company:** fill in the GST IN, upload the logo, and check the phone numbers, address and Reg No.
+- **Settings → Invoices:** set *Start numbering from* to the next number in your paper invoice book, so the numbers continue without gaps.
 
 ## Notes
 - WhatsApp Business API message charges, AI usage charges and hosting are billed by the respective providers (see the project quotation).
