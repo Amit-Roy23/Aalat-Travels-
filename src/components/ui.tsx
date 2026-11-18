@@ -23,7 +23,7 @@ export const Button = forwardRef<HTMLButtonElement, BtnProps>(function Button({ 
         size === "md" && "h-10 px-4 text-sm",
         size === "lg" && "h-12 px-6 text-[15px]",
         size === "icon" && "h-9 w-9 text-sm",
-        variant === "primary" && "bg-brand text-white shadow-[0_6px_18px_-8px_rgb(var(--brand))] hover:brightness-110",
+        variant === "primary" && "bg-brand text-white shadow-[inset_0_1px_0_rgb(255_255_255/0.18),0_8px_20px_-10px_rgb(var(--brand))] hover:brightness-110",
         variant === "secondary" && "bg-surface-2 text-ink hover:bg-line/70",
         variant === "outline" && "border border-line bg-surface text-ink hover:bg-surface-2",
         variant === "ghost" && "text-ink/80 hover:bg-surface-2 hover:text-ink",

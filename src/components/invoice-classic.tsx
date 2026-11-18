@@ -137,7 +137,7 @@ export function ClassicInvoice({ inv, company, settings, className = "" }: { inv
         <div className="px-3 py-1 sm:px-5">
           <Row label="Name" value={inv.customer.name} />
           <Row label="Address" value={[inv.customer.address, inv.customer.city].filter(Boolean).join(", ")} />
-          <div className="grid grid-cols-2 gap-x-5">
+          <div className="grid grid-cols-1 gap-x-5 min-[480px]:grid-cols-2">
             <Row label="Contact No." value={[inv.customer.phone && displayPhone(inv.customer.phone), inv.customer.altPhone && displayPhone(inv.customer.altPhone)].filter(Boolean).join(" / ")} />
             <Row label="Date" value={fmtDate(inv.issueDate)} />
           </div>
@@ -148,7 +148,7 @@ export function ClassicInvoice({ inv, company, settings, className = "" }: { inv
       {/* Tour details */}
       <div>
         <Band>Tour Details</Band>
-        <div className="grid grid-cols-2 gap-x-5 px-3 py-1 sm:px-5">
+        <div className="grid grid-cols-1 gap-x-5 px-3 py-1 min-[480px]:grid-cols-2 sm:px-5">
           <Row label="Name of Tour" value={t.name || inv.tripTitle} />
           <Row label="Duration" value={t.duration} />
           <Row label="Number of Pax." value={pax} />
@@ -202,30 +202,30 @@ export function ClassicInvoice({ inv, company, settings, className = "" }: { inv
       <div>
         <Band>Payment Details</Band>
         <div className="px-3 py-1 sm:px-5">
-          <div className="grid grid-cols-2 gap-x-5">
+          <div className="grid grid-cols-1 gap-x-5 min-[480px]:grid-cols-2">
             <Row label="Total Amount" value={money(taxable)} />
             <Row label="Advance Payment" value={advance ? money(advance) : "—"} />
             <Row label="Part Payment" value={part ? money(part) : "—"} />
             <Row label="Due Amount" value={money(inv.balance)} />
           </div>
           {igst ? (
-            <div className="grid grid-cols-2 gap-x-5">
+            <div className="grid grid-cols-1 gap-x-5 min-[480px]:grid-cols-2">
               <Row label={`IGST (${inv.taxRate}%)`} value={money(inv.taxAmount)} />
               <Row label="Grand Total" value={<span className="text-[1.08em] font-extrabold">{money(inv.total)}</span>} />
             </div>
           ) : (
-            <div className="grid grid-cols-2 gap-x-5 sm:grid-cols-[1fr_1fr_1.25fr] sm:gap-x-4">
+            <div className="grid grid-cols-1 gap-x-5 min-[480px]:grid-cols-2 sm:grid-cols-[1fr_1fr_1.25fr] sm:gap-x-4">
               <Row label={`CGST${half ? ` (${half}%)` : ""}`} value={money(cgst)} />
               <Row label={`SGST${half ? ` (${half}%)` : ""}`} value={money(sgst)} />
-              <Row className="col-span-2 sm:col-span-1" label="Grand Total" value={<span className="text-[1.08em] font-extrabold">{money(inv.total)}</span>} />
+              <Row className="min-[480px]:col-span-2 sm:col-span-1" label="Grand Total" value={<span className="text-[1.08em] font-extrabold">{money(inv.total)}</span>} />
             </div>
           )}
         </div>
       </div>
 
       {/* Policies */}
-      <div className="grid grid-cols-2 border-t-[1.5px] text-[9.5px] sm:text-[11.5px]" style={{ borderColor: RED }}>
-        <div className="border-r-[1.5px] px-3 py-1.5 sm:px-5" style={{ borderColor: RED }}>
+      <div className="grid grid-cols-1 border-t-[1.5px] text-[10.5px] min-[480px]:grid-cols-2 min-[480px]:text-[9.5px] sm:text-[11.5px]" style={{ borderColor: RED }}>
+        <div className="px-3 py-1.5 min-[480px]:border-r-[1.5px] sm:px-5" style={{ borderColor: RED }}>
           <p className="font-bold underline" style={{ color: RED }}>
             Cancellation Policy:
           </p>
@@ -238,7 +238,7 @@ export function ClassicInvoice({ inv, company, settings, className = "" }: { inv
             ))}
           </ul>
         </div>
-        <div className="px-3 py-1.5 sm:px-4">
+        <div className="border-t-[1.5px] px-3 py-1.5 min-[480px]:border-t-0 sm:px-4" style={{ borderColor: RED }}>
           <p className="font-bold underline" style={{ color: RED }}>
             Child Policy:
           </p>
@@ -248,7 +248,7 @@ export function ClassicInvoice({ inv, company, settings, className = "" }: { inv
             ))}
           </div>
         </div>
-        <div className="border-r-[1.5px] border-t-[1.5px] px-3 py-1.5 sm:px-5" style={{ borderColor: RED }}>
+        <div className="border-t-[1.5px] px-3 py-1.5 min-[480px]:border-r-[1.5px] sm:px-5" style={{ borderColor: RED }}>
           <p className="font-bold underline" style={{ color: RED }}>
             Payment Terms:
           </p>

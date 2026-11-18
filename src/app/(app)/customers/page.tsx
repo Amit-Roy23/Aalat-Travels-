@@ -70,7 +70,7 @@ function Inner() {
                       <tr key={c._id} className="cursor-pointer hover:bg-surface-2/60" onClick={() => router.push(`/customers/${c._id}`)}>
                         <td className="px-5 py-3">
                           <div className="flex items-center gap-3">
-                            <Avatar name={c.name} color="#2F7FD8" size={34} />
+                            <Avatar name={c.name} color="#2563EB" size={34} />
                             <div>
                               <p className="font-semibold">{c.name}</p>
                               <p className="text-xs text-muted">{c.city || "—"}</p>
@@ -104,7 +104,7 @@ function Inner() {
                 {data.items.map((c) => (
                   <li key={c._id}>
                     <Link href={`/customers/${c._id}`} className="flex items-center gap-3 px-4 py-3.5">
-                      <Avatar name={c.name} color="#2F7FD8" size={38} />
+                      <Avatar name={c.name} color="#2563EB" size={38} />
                       <div className="min-w-0 flex-1">
                         <p className="truncate font-semibold">{c.name}</p>
                         <p className="truncate text-xs text-muted">

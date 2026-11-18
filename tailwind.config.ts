@@ -20,6 +20,9 @@ export default {
         sky: { DEFAULT: c("sky"), soft: c("sky-soft") },
         leaf: { DEFAULT: c("leaf"), soft: c("leaf-soft") },
         slate2: { DEFAULT: c("slate2"), soft: c("slate2-soft") },
+        sidebar: { DEFAULT: c("sidebar"), 2: c("sidebar-2") },
+        accent: c("accent"),
+        hl: c("hl"),
         wa: { DEFAULT: "#25D366", dark: "#075E54", bubble: c("wa-bubble"), chat: c("wa-chat") },
       },
       fontFamily: {
@@ -28,7 +31,7 @@ export default {
       },
       borderRadius: { xl: "14px", "2xl": "18px", "3xl": "24px" },
       boxShadow: {
-        card: "0 1px 2px rgb(var(--shadow) / 0.06), 0 4px 16px -6px rgb(var(--shadow) / 0.10)",
+        card: "0 1px 2px rgb(var(--shadow) / 0.05), 0 6px 20px -8px rgb(var(--shadow) / 0.12)",
         pop: "0 12px 40px -12px rgb(var(--shadow) / 0.35)",
       },
       keyframes: {

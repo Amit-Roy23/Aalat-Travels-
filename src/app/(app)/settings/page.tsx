@@ -92,7 +92,7 @@ export default function SettingsPage() {
           ...(isAdmin ? [{ value: "data" as Section, label: "Demo data" }] : []),
         ]}
       />
-      <fieldset disabled={ro} className="space-y-4">
+      <fieldset disabled={ro} className="min-w-0 space-y-4">
         {sec === "company" && (
           <Card title={<span className="flex items-center gap-2"><Building2 className="h-4 w-4" /> Company profile</span>}>
             <div className="grid gap-3.5 sm:grid-cols-2">
@@ -219,7 +219,7 @@ export default function SettingsPage() {
           <>
             <div className={cn("flex flex-col gap-3 rounded-2xl border p-4 sm:flex-row sm:items-center", ints.ai === "claude" ? "border-brand/30 bg-brand-soft/50" : "border-sun/30 bg-sun-soft/60")}>
               <Bot className={cn("h-6 w-6 shrink-0", ints.ai === "claude" ? "text-brand" : "text-sun")} />
-              <div className="flex-1 text-sm">
+              <div className="min-w-0 flex-1 break-words text-sm">
                 <p className="font-semibold">{ints.ai === "claude" ? "Claude AI is connected — replies in 90+ languages." : "Using the built-in demo AI engine (English, Hindi, Hinglish, Bengali, Arabic, Spanish, French)."}</p>
                 <p className="text-muted">{ints.ai === "claude" ? "Answers are grounded in the knowledge base below." : "Add ANTHROPIC_API_KEY to your Vercel environment variables to switch to Claude for natural, any-language replies."}</p>
               </div>
@@ -359,7 +359,7 @@ export default function SettingsPage() {
                   </Button>
                 </div>
                 <p className="mb-1.5 mt-4 text-xs font-semibold text-muted">Example — send a lead from your website or any tool:</p>
-                <pre className="scrollbar-thin overflow-x-auto rounded-xl bg-[#0D1B2A] p-3.5 text-[11.5px] leading-relaxed text-[#cfe9e5]">{`curl -X POST ${ints.webhooks.leads} \\
+                <pre className="scrollbar-thin overflow-x-auto rounded-xl bg-sidebar p-3.5 text-[11.5px] leading-relaxed text-[#F9DCE4]">{`curl -X POST ${ints.webhooks.leads} \\
   -H "Content-Type: application/json" \\
   -H "X-API-Key: ${s.leads.captureApiKey}" \\
   -d '{"name":"Rohan Gupta","phone":"9876543210","email":"rohan@mail.com",

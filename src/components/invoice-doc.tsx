@@ -30,8 +30,8 @@ const stampTone: Record<string, string> = { paid: "border-leaf text-leaf", overd
 export function InvoiceDocument({ inv, company, bank, className }: { inv: InvoiceDocData; company: CompanyData; bank?: { bankDetails?: string; upiId?: string }; className?: string }) {
   return (
     <article className={cn("print-area overflow-hidden rounded-3xl border border-line bg-white text-[#13202E] shadow-card", className)}>
-      <div className="relative bg-[#0D1B2A] px-6 py-6 text-white sm:px-10 sm:py-8">
-        <div className="absolute -right-10 -top-16 h-48 w-48 rounded-full bg-[#2CC2AE]/20 blur-2xl" />
+      <div className="relative bg-sidebar px-6 py-6 text-white sm:px-10 sm:py-8">
+        <div className="absolute -right-10 -top-16 h-48 w-48 rounded-full bg-hl/20 blur-2xl" />
         <div className="relative flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex items-center gap-3">
             {company.logo ? <img src={company.logo} alt="" className="h-12 w-12 rounded-full bg-white object-contain" /> : <LogoMark className="h-12 w-12" />}
@@ -41,7 +41,7 @@ export function InvoiceDocument({ inv, company, bank, className }: { inv: Invoic
             </div>
           </div>
           <div className="sm:text-right">
-            <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#2CC2AE]">Tax invoice</p>
+            <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-hl">Tax invoice</p>
             <p className="font-display text-2xl font-extrabold">{inv.number}</p>
           </div>
         </div>

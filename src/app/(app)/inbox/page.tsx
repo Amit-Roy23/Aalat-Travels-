@@ -37,8 +37,8 @@ function InboxInner() {
   };
 
   return (
-    <div className="-mx-4 -mb-28 -mt-4 sm:-mx-6 lg:-mx-8 lg:-mb-10 lg:-mt-6">
-      <div className="flex h-[calc(100dvh-4rem-64px)] overflow-hidden border-line bg-surface lg:h-[calc(100dvh-4rem)]">
+    <div className="inbox-wrap -mx-4 -mb-28 -mt-4 sm:-mx-6 lg:-mx-8 lg:-mb-10 lg:-mt-6">
+      <div className="inbox-shell flex h-[calc(100dvh-4rem-64px)] overflow-hidden border-line bg-surface lg:h-[calc(100dvh-4rem)]">
         {/* list */}
         <aside className={cn("flex w-full flex-col border-r border-line md:w-[340px] md:shrink-0 xl:w-[380px]", active && "hidden md:flex")}>
           <div className="space-y-2.5 border-b border-line p-3">
@@ -78,7 +78,7 @@ function InboxInner() {
                   <div className="relative">
                     <Avatar name={c.name || c.phone} color="#128C7E" size={44} />
                     {c.aiEnabled && !c.handoff && (
-                      <span className="absolute -bottom-0.5 -right-0.5 flex h-[18px] w-[18px] items-center justify-center rounded-full bg-brand text-white ring-2 ring-surface" title="AI auto-reply on">
+                      <span className="absolute -bottom-0.5 -right-0.5 flex h-[18px] w-[18px] items-center justify-center rounded-full bg-accent text-[#3a2300] ring-2 ring-surface" title="AI auto-reply on">
                         <Bot className="h-2.5 w-2.5" />
                       </span>
                     )}
