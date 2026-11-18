@@ -104,7 +104,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
       <div className="card mb-4 overflow-hidden">
         <div className="flex flex-col gap-4 p-4 sm:p-5 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex min-w-0 items-center gap-3.5">
-            <Avatar name={lead.name} color={lead.assignedTo?.color ?? "#0E8F80"} size={52} />
+            <Avatar name={lead.name} color={lead.assignedTo?.color ?? "#BE123C"} size={52} />
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
                 <h1 className="font-display text-xl font-extrabold tracking-tight sm:text-2xl">{lead.name}</h1>

@@ -26,7 +26,7 @@ import {
 import { api, useApi } from "@/lib/client";
 import { cn, displayPhone, money, timeAgo } from "@/lib/format";
 import { Avatar, Button, LeadStatusBadge, Menu, MenuItem, Modal, Field, useUi, InvoiceStatusBadge } from "./ui";
-import { Logo } from "./logo";
+import { Logo, LogoMark } from "./logo";
 import { ThemeToggle } from "./theme-toggle";
 import { useMe } from "./session";
 import { LeadFormModal, FollowUpFormModal } from "./forms";
@@ -66,12 +66,12 @@ export function AppShell({ children }: { children: ReactNode }) {
             href={n.href}
             className={cn(
               "group flex items-center gap-3 rounded-xl px-3 py-2.5 text-[14px] font-semibold transition",
-              onDark ? (active ? "bg-white/10 text-white" : "text-white/60 hover:bg-white/5 hover:text-white") : active ? "bg-brand-soft text-brand-ink" : "text-ink/70 hover:bg-surface-2",
+              onDark ? (active ? "bg-gradient-to-r from-brand to-brand/70 text-white shadow-[0_8px_20px_-10px_rgb(var(--brand))]" : "text-white/65 hover:bg-white/[0.06] hover:text-white") : active ? "bg-brand-soft text-brand-ink" : "text-ink/70 hover:bg-surface-2",
             )}
           >
-            <n.icon className={cn("h-[18px] w-[18px]", active && onDark && "text-[#2CC2AE]")} />
+            <n.icon className={cn("h-[18px] w-[18px]", !active && onDark && "text-white/55 group-hover:text-white")} />
             <span className="flex-1">{n.label}</span>
-            {n.href === "/ai-demo" && <Sparkles className="h-3.5 w-3.5 text-[#F0B43C]" />}
+            {n.href === "/ai-demo" && <Sparkles className="h-3.5 w-3.5 text-accent" />}
             {count > 0 && <span className="rounded-full bg-[#25D366] px-1.5 py-px text-[11px] font-bold text-[#073B2F]">{count}</span>}
           </Link>
         );
@@ -82,7 +82,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="min-h-dvh lg:pl-[264px]">
       {/* Desktop sidebar */}
-      <aside className="fixed inset-y-0 left-0 z-40 hidden w-[264px] flex-col bg-[rgb(var(--sidebar))] px-4 py-5 lg:flex">
+      <aside className="fixed inset-y-0 left-0 z-40 hidden w-[264px] flex-col bg-gradient-to-b from-sidebar via-sidebar to-sidebar-2 px-4 py-5 lg:flex">
         <div className="px-2">
           <Logo name={me.company.name} light />
         </div>
@@ -96,7 +96,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       {drawer && (
         <div className="fixed inset-0 z-[70] lg:hidden">
           <div className="absolute inset-0 bg-black/50" onClick={() => setDrawer(false)} />
-          <aside className="absolute inset-y-0 left-0 flex w-[82%] max-w-[300px] animate-slide-in flex-col bg-[rgb(var(--sidebar))] px-4 py-5">
+          <aside className="absolute inset-y-0 left-0 flex w-[82%] max-w-[300px] animate-slide-in flex-col bg-gradient-to-b from-sidebar via-sidebar to-sidebar-2 px-4 py-5">
             <div className="flex items-center justify-between px-2">
               <Logo name={me.company.name} light />
               <button onClick={() => setDrawer(false)} className="rounded-lg p-1.5 text-white/70 hover:bg-white/10" aria-label="Close menu">
@@ -112,19 +112,21 @@ export function AppShell({ children }: { children: ReactNode }) {
       )}
 
       <Topbar onMenu={() => setDrawer(true)} />
-      <main className="mx-auto max-w-[1400px] px-4 pb-28 pt-4 sm:px-6 lg:px-8 lg:pb-10 lg:pt-6">{children}</main>
+      <main className="app-main mx-auto max-w-[1400px] px-4 pb-28 pt-4 sm:px-6 lg:px-8 lg:pb-10 lg:pt-6">{children}</main>
 
       {/* Mobile bottom nav */}
-      <nav className="safe-bottom fixed inset-x-0 bottom-0 z-40 border-t border-line bg-surface/95 backdrop-blur lg:hidden">
+      <nav className="mobile-nav safe-bottom fixed inset-x-0 bottom-0 z-40 border-t border-line bg-surface/95 backdrop-blur lg:hidden">
         <div className="grid grid-cols-5">
           {[NAV[0], NAV[1], NAV[4], NAV[3]].map((n) => {
             const active = isActive(n.href);
             const count = n.badge === "inbox" ? (inbox?.counts.unread ?? 0) : 0;
             return (
-              <Link key={n.href} href={n.href} className={cn("relative flex flex-col items-center gap-0.5 py-2.5 text-[10.5px] font-semibold", active ? "text-brand" : "text-muted")}>
-                <n.icon className="h-[21px] w-[21px]" />
+              <Link key={n.href} href={n.href} className={cn("flex flex-col items-center gap-0.5 py-2.5 text-[10.5px] font-semibold", active ? "text-brand" : "text-muted")}>
+                <span className="relative">
+                  <n.icon className="h-[21px] w-[21px]" />
+                  {count > 0 && <span className="absolute -right-2.5 -top-1.5 min-w-4 rounded-full bg-[#25D366] px-1 text-center text-[10px] font-bold leading-4 text-[#073B2F] ring-2 ring-surface">{count}</span>}
+                </span>
                 {n.label.replace("WhatsApp ", "")}
-                {count > 0 && <span className="absolute right-[22%] top-1.5 rounded-full bg-[#25D366] px-1 text-[10px] font-bold text-[#073B2F]">{count}</span>}
               </Link>
             );
           })}
@@ -141,11 +143,11 @@ export function AppShell({ children }: { children: ReactNode }) {
 function IntegrationCard() {
   const me = useMe();
   return (
-    <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.04] p-3.5">
+    <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.05] p-3.5 backdrop-blur">
       <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-white/40">Automation</p>
       <div className="mt-2 space-y-1.5 text-[12.5px] font-medium text-white/80">
         <div className="flex items-center gap-2">
-          <span className={cn("h-2 w-2 rounded-full", me.integrations.ai === "claude" ? "bg-[#2CC2AE]" : "bg-[#F0B43C]")} />
+          <span className={cn("h-2 w-2 rounded-full", me.integrations.ai === "claude" ? "bg-[#4ADE80]" : "bg-accent")} />
           AI replies: {me.integrations.ai === "claude" ? "Claude (live)" : "Built-in demo AI"}
         </div>
         <div className="flex items-center gap-2">
@@ -177,8 +179,9 @@ function Topbar({ onMenu }: { onMenu: () => void }) {
         <button onClick={onMenu} className="-ml-1 rounded-xl p-2 text-ink/80 hover:bg-surface-2 lg:hidden" aria-label="Open menu">
           <MenuIcon className="h-5 w-5" />
         </button>
-        <div className="lg:hidden">
-          <span className="font-display text-[17px] font-extrabold tracking-tight">{me.company.name}</span>
+        <div className="flex min-w-0 items-center gap-2 lg:hidden">
+          <LogoMark className="h-8 w-8 shrink-0" />
+          <span className="hidden truncate font-display text-[16px] font-extrabold tracking-tight min-[400px]:block">{me.company.name}</span>
         </div>
         <div className="hidden flex-1 md:block">
           <GlobalSearch />
@@ -216,7 +219,7 @@ function Topbar({ onMenu }: { onMenu: () => void }) {
           <Menu
             trigger={() => (
               <button className="ml-0.5 flex items-center gap-2 rounded-full p-0.5 hover:bg-surface-2 sm:pr-3" aria-label="Account menu">
-                <Avatar name={me.user.name} color="#0E8F80" size={34} />
+                <Avatar name={me.user.name} color="rgb(var(--brand))" size={34} />
                 <span className="hidden text-left leading-tight sm:block">
                   <span className="block text-[13px] font-bold">{me.user.name.split(" ")[0]}</span>
                   <span className="block text-[11px] capitalize text-muted">{me.user.role === "agent" ? "Sales agent" : "Admin"}</span>

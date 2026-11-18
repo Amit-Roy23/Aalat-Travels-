@@ -25,7 +25,7 @@ export default function PublicInvoice({ params }: { params: Promise<{ token: str
   return (
     <div className="mx-auto max-w-4xl px-4 py-6 sm:py-10">
       <div className="no-print mb-4 flex justify-end">
-        <button onClick={() => window.print()} className="inline-flex items-center gap-2 rounded-xl bg-[#0E8F80] px-4 py-2.5 text-sm font-semibold text-white">
+        <button onClick={() => window.print()} className="inline-flex items-center gap-2 rounded-xl bg-[#BE123C] px-4 py-2.5 text-sm font-semibold text-white">
           <Download className="h-4 w-4" /> Print / Download PDF
         </button>
       </div>

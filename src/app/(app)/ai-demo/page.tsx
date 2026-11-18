@@ -25,12 +25,12 @@ export default function AiDemoPage() {
   const [tab, setTab] = useState<"showcase" | "sandbox">("showcase");
   return (
     <div className="animate-fade-up">
-      <div className="relative mb-5 overflow-hidden rounded-3xl bg-[#0D1B2A] px-5 py-6 text-white sm:px-8 sm:py-8">
-        <div className="absolute -right-16 -top-20 h-64 w-64 rounded-full bg-[#2CC2AE]/25 blur-3xl" />
-        <div className="absolute -bottom-24 left-1/3 h-56 w-56 rounded-full bg-[#F0B43C]/15 blur-3xl" />
+      <div className="relative mb-5 overflow-hidden rounded-3xl bg-gradient-to-br from-sidebar via-sidebar-2 to-[#6b1032] px-5 py-6 text-white sm:px-8 sm:py-8">
+        <div className="absolute -right-16 -top-20 h-64 w-64 rounded-full bg-hl/25 blur-3xl" />
+        <div className="absolute -bottom-24 left-1/3 h-56 w-56 rounded-full bg-accent/15 blur-3xl" />
         <div className="relative flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-2xl">
-            <span className="chip bg-white/10 text-[#2CC2AE]">
+            <span className="chip bg-white/10 text-hl">
               <Sparkles className="h-3 w-3" /> AI-powered WhatsApp automation
             </span>
             <h1 className="mt-3 font-display text-[26px] font-extrabold leading-tight tracking-tight sm:text-4xl">Watch the AI turn chats into bookings</h1>
@@ -38,7 +38,7 @@ export default function AiDemoPage() {
           </div>
           <div className="flex flex-wrap gap-2 text-[12.5px] font-semibold">
             <span className="flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5">
-              <span className={cn("h-2 w-2 rounded-full", me.integrations.ai === "claude" ? "bg-[#2CC2AE]" : "bg-[#F0B43C]")} />
+              <span className={cn("h-2 w-2 rounded-full", me.integrations.ai === "claude" ? "bg-hl" : "bg-accent")} />
               Engine: {me.integrations.ai === "claude" ? "Claude AI (live, 90+ languages)" : "Built-in demo AI (7 languages)"}
             </span>
           </div>

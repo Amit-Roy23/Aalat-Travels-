@@ -1,5 +1,5 @@
 "use client";
-import { Area, AreaChart, Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { cn } from "@/lib/format";
 
 const axis = { stroke: "rgb(var(--muted))", fontSize: 11, tickLine: false, axisLine: false } as const;
@@ -40,22 +40,16 @@ export function TrendChart({ data }: { data: { date: string; leads: number; conv
   return (
     <div>
       <Legend items={[{ label: "New leads", color: "var(--series-1)" }, { label: "Converted (of those leads)", color: "var(--series-2)" }]} />
-      <div className="mt-3 h-60">
+      <div className="mt-3 h-56 sm:h-60">
         <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={data} margin={{ top: 8, right: 8, left: -8, bottom: 0 }}>
-            <defs>
-              <linearGradient id="gl" x1="0" x2="0" y1="0" y2="1">
-                <stop offset="0" stopColor="var(--series-1)" stopOpacity={0.22} />
-                <stop offset="1" stopColor="var(--series-1)" stopOpacity={0} />
-              </linearGradient>
-            </defs>
+          <BarChart data={data} margin={{ top: 8, right: 4, left: -18, bottom: 0 }} barGap={1} barCategoryGap="22%">
             <CartesianGrid vertical={false} stroke="rgb(var(--line))" strokeDasharray="3 4" />
-            <XAxis dataKey="date" {...axis} tickFormatter={dayFmt} interval="preserveStartEnd" minTickGap={24} />
-            <YAxis {...axis} allowDecimals={false} width={40} />
-            <Tooltip content={<Tip labelFmt={dayFmt} />} cursor={{ stroke: "rgb(var(--muted))", strokeDasharray: "3 3" }} />
-            <Area type="monotone" dataKey="leads" name="New leads" stroke="var(--series-1)" strokeWidth={2} fill="url(#gl)" activeDot={{ r: 4, strokeWidth: 2, stroke: "rgb(var(--surface))" }} />
-            <Area type="monotone" dataKey="converted" name="Converted" stroke="var(--series-2)" strokeWidth={2} fill="none" activeDot={{ r: 4, strokeWidth: 2, stroke: "rgb(var(--surface))" }} />
-          </AreaChart>
+            <XAxis dataKey="date" {...axis} tickFormatter={dayFmt} interval="preserveStartEnd" minTickGap={28} />
+            <YAxis {...axis} allowDecimals={false} width={36} />
+            <Tooltip content={<Tip labelFmt={dayFmt} />} cursor={{ fill: "rgb(var(--surface-2))" }} />
+            <Bar dataKey="leads" name="New leads" fill="var(--series-1)" radius={[4, 4, 0, 0]} maxBarSize={14} />
+            <Bar dataKey="converted" name="Converted" fill="var(--series-2)" radius={[4, 4, 0, 0]} maxBarSize={14} />
+          </BarChart>
         </ResponsiveContainer>
       </div>
     </div>

@@ -200,7 +200,7 @@ export function InvoiceForm({ init, presetCustomer }: { init?: InvoiceInit; pres
           title="Tour details"
           action={
             !editing && !!custData?.leads.length && (
-              <select className="input h-8 w-auto max-w-[220px] text-xs" value={leadId} onChange={(e) => fillFromLead(e.target.value)} aria-label="Fill from enquiry">
+              <select className="input h-8 w-40 text-xs sm:w-auto sm:max-w-[220px]" value={leadId} onChange={(e) => fillFromLead(e.target.value)} aria-label="Fill from enquiry">
                 <option value="">Fill from enquiry…</option>
                 {custData.leads.map((l) => (
                   <option key={l._id} value={l._id}>
@@ -262,7 +262,7 @@ export function InvoiceForm({ init, presetCustomer }: { init?: InvoiceInit; pres
           title="Line items"
           action={
             !!st?.settings.ai.packages.length && (
-              <select className="input h-8 w-auto text-xs" value="" onChange={(e) => addPackage(e.target.value)} aria-label="Add package">
+              <select className="input h-8 w-40 text-xs sm:w-auto sm:max-w-[260px]" value="" onChange={(e) => addPackage(e.target.value)} aria-label="Add package">
                 <option value="">+ Add a package…</option>
                 {st.settings.ai.packages.map((p) => (
                   <option key={p.name} value={p.name}>

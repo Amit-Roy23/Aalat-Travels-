@@ -63,7 +63,7 @@ export default function CustomerPage({ params }: { params: Promise<{ id: string 
       </Link>
       <div className="card mb-4 flex flex-col gap-4 p-4 sm:p-5 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex items-center gap-3.5">
-          <Avatar name={c.name} color="#2F7FD8" size={56} />
+          <Avatar name={c.name} color="#2563EB" size={56} />
           <div>
             <h1 className="font-display text-2xl font-extrabold tracking-tight">{c.name}</h1>
             <p className="mt-0.5 flex flex-wrap gap-x-3 text-sm text-muted">
@@ -112,13 +112,13 @@ export default function CustomerPage({ params }: { params: Promise<{ id: string 
         </div>
       </div>
 
-      <div className="mb-4 grid grid-cols-3 gap-3">
+      <div className="mb-4 grid grid-cols-1 gap-2 min-[440px]:grid-cols-3 min-[440px]:gap-3">
         {[
           ["Total billed", money(data.billing.billed), ""],
           ["Paid", money(data.billing.paid), "text-leaf"],
           ["Outstanding", money(data.billing.balance), data.billing.balance > 0 ? "text-coral" : ""],
         ].map(([l, v, cls]) => (
-          <div key={l} className="card p-3 sm:p-4">
+          <div key={l} className="card flex items-center justify-between gap-2 p-3 min-[440px]:block sm:p-4">
             <p className="text-[11px] font-semibold uppercase tracking-wider text-muted sm:text-xs">{l}</p>
             <p className={cn("mt-1 font-display text-base font-extrabold sm:text-xl", cls)}>{v}</p>
           </div>

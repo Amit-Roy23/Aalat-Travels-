@@ -202,9 +202,9 @@ export default function DashboardPage() {
         </Card>
 
         <div className="space-y-4">
-          <div className="relative overflow-hidden rounded-2xl bg-[#0D1B2A] p-5 text-white shadow-card">
-            <div className="absolute -right-10 -top-10 h-36 w-36 rounded-full bg-[#2CC2AE]/20 blur-2xl" />
-            <div className="relative flex items-center gap-2 text-[12px] font-bold uppercase tracking-wider text-[#2CC2AE]">
+          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-sidebar via-sidebar-2 to-[#6b1032] p-5 text-white shadow-card">
+            <div className="absolute -right-10 -top-10 h-36 w-36 rounded-full bg-hl/20 blur-2xl" />
+            <div className="relative flex items-center gap-2 text-[12px] font-bold uppercase tracking-wider text-hl">
               <Bot className="h-4 w-4" /> AI WhatsApp · 7 days
             </div>
             <div className="relative mt-3 grid grid-cols-3 gap-2">

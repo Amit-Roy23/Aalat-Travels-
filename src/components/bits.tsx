@@ -11,10 +11,10 @@ export function KpiCard({ label, value, icon, foot, tone = "brand", href }: { la
     <div className="card relative h-full overflow-hidden transition hover:-translate-y-0.5 hover:shadow-pop">
       <div className="flex items-start justify-between gap-3 p-4 pb-3">
         <div className="min-w-0">
-          <p className="text-[12px] font-semibold uppercase tracking-wider text-muted">{label}</p>
+          <p className="text-[11px] font-semibold uppercase leading-tight tracking-wide text-muted sm:text-[12px] sm:tracking-wider">{label}</p>
           <p className="mt-1.5 font-display text-[24px] sm:text-[28px] font-extrabold leading-none tracking-tight">{value}</p>
         </div>
-        <span className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-xl", iconBg)}>{icon}</span>
+        <span className={cn("hidden h-10 w-10 shrink-0 items-center justify-center rounded-xl min-[400px]:flex", iconBg)}>{icon}</span>
       </div>
       {foot && (
         <>

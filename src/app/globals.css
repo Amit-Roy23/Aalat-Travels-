@@ -3,58 +3,68 @@
 @tailwind utilities;
 
 :root {
-  --bg: 246 244 239;
+  --bg: 250 247 245;
   --surface: 255 255 255;
-  --surface-2: 241 238 231;
-  --line: 230 225 215;
-  --ink: 19 32 46;
-  --muted: 104 110 120;
-  --brand: 14 143 128;
-  --brand-soft: 221 243 239;
-  --brand-ink: 6 78 70;
-  --sun: 207 140 10;
-  --sun-soft: 252 241 214;
-  --coral: 220 88 66;
-  --coral-soft: 251 227 222;
-  --sky: 47 127 216;
-  --sky-soft: 224 236 251;
-  --leaf: 34 145 84;
-  --leaf-soft: 223 243 230;
-  --slate2: 100 116 139;
-  --slate2-soft: 238 240 243;
-  --wa-bubble: 217 253 211;
-  --wa-chat: 239 234 226;
-  --shadow: 19 32 46;
-  --sidebar: 13 27 42;
+  --surface-2: 246 241 239;
+  --line: 236 227 224;
+  --ink: 30 17 25;
+  --muted: 112 98 106;
+  --brand: 190 18 60;
+  --brand-soft: 255 230 236;
+  --brand-ink: 136 19 55;
+  --brand-text: 190 18 60;
+  --sun: 180 110 6;
+  --sun-soft: 254 243 205;
+  --coral: 214 84 38;
+  --coral-soft: 253 232 222;
+  --sky: 37 99 235;
+  --sky-soft: 226 235 255;
+  --leaf: 21 128 69;
+  --leaf-soft: 221 244 230;
+  --slate2: 100 100 118;
+  --slate2-soft: 240 237 241;
+  --wa-bubble: 220 248 198;
+  --wa-chat: 239 231 222;
+  --shadow: 60 20 40;
+  --sidebar: 31 11 22;
+  --sidebar-2: 58 14 35;
+  --accent: 232 170 66;
+  --hl: 251 113 133;
   --series-1: #2a78d6;
   --series-2: #eb6834;
   color-scheme: light;
+  --font-sans: "Plus Jakarta Sans Variable";
+  --font-display: "Bricolage Grotesque Variable";
 }
 
 :root[data-theme="dark"] {
-  --bg: 10 15 22;
-  --surface: 18 25 34;
-  --surface-2: 25 34 45;
-  --line: 37 49 63;
-  --ink: 231 236 242;
-  --muted: 142 154 168;
-  --brand: 44 194 174;
-  --brand-soft: 16 48 45;
-  --brand-ink: 157 235 223;
-  --sun: 240 180 60;
-  --sun-soft: 56 42 14;
-  --coral: 244 120 98;
-  --coral-soft: 60 28 24;
-  --sky: 96 165 250;
-  --sky-soft: 20 38 64;
-  --leaf: 74 200 128;
-  --leaf-soft: 18 50 32;
-  --slate2: 148 163 184;
-  --slate2-soft: 32 41 54;
+  --bg: 15 10 14;
+  --surface: 25 18 23;
+  --surface-2: 35 26 32;
+  --line: 50 38 46;
+  --ink: 244 237 240;
+  --muted: 166 150 159;
+  --brand: 225 29 72;
+  --brand-soft: 70 20 37;
+  --brand-ink: 255 205 216;
+  --brand-text: 253 164 184;
+  --sun: 250 190 60;
+  --sun-soft: 58 42 12;
+  --coral: 251 136 96;
+  --coral-soft: 66 30 20;
+  --sky: 110 165 250;
+  --sky-soft: 22 36 64;
+  --leaf: 80 210 130;
+  --leaf-soft: 18 48 32;
+  --slate2: 165 162 182;
+  --slate2-soft: 38 32 42;
   --wa-bubble: 0 92 75;
-  --wa-chat: 11 20 26;
+  --wa-chat: 17 13 16;
   --shadow: 0 0 0;
-  --sidebar: 8 14 21;
+  --sidebar: 12 6 10;
+  --sidebar-2: 38 9 24;
+  --accent: 240 185 85;
+  --hl: 251 113 133;
   --series-1: #3987e5;
   --series-2: #d95926;
   color-scheme: dark;
@@ -62,29 +72,35 @@
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: 10 15 22;
-    --surface: 18 25 34;
-    --surface-2: 25 34 45;
-    --line: 37 49 63;
-    --ink: 231 236 242;
-    --muted: 142 154 168;
-    --brand: 44 194 174;
-    --brand-soft: 16 48 45;
-    --brand-ink: 157 235 223;
-    --sun: 240 180 60;
-    --sun-soft: 56 42 14;
-    --coral: 244 120 98;
-    --coral-soft: 60 28 24;
-    --sky: 96 165 250;
-    --sky-soft: 20 38 64;
-    --leaf: 74 200 128;
-    --leaf-soft: 18 50 32;
-    --slate2: 148 163 184;
-    --slate2-soft: 32 41 54;
+    --bg: 15 10 14;
+    --surface: 25 18 23;
+    --surface-2: 35 26 32;
+    --line: 50 38 46;
+    --ink: 244 237 240;
+    --muted: 166 150 159;
+    --brand: 225 29 72;
+    --brand-soft: 70 20 37;
+    --brand-ink: 255 205 216;
+    --brand-text: 253 164 184;
+    --sun: 250 190 60;
+    --sun-soft: 58 42 12;
+    --coral: 251 136 96;
+    --coral-soft: 66 30 20;
+    --sky: 110 165 250;
+    --sky-soft: 22 36 64;
+    --leaf: 80 210 130;
+    --leaf-soft: 18 48 32;
+    --slate2: 165 162 182;
+    --slate2-soft: 38 32 42;
     --wa-bubble: 0 92 75;
-    --wa-chat: 11 20 26;
+    --wa-chat: 17 13 16;
     --shadow: 0 0 0;
-    --sidebar: 8 14 21;
+    --sidebar: 12 6 10;
+    --sidebar-2: 38 9 24;
+    --accent: 240 185 85;
+    --hl: 251 113 133;
+    --series-1: #3987e5;
+    --series-2: #d95926;
     color-scheme: dark;
   }
 }
@@ -95,18 +111,26 @@ body {
   color: rgb(var(--ink));
 }
 body {
+  background-image: radial-gradient(900px 420px at 85% -120px, rgb(var(--brand) / 0.07), transparent 70%), radial-gradient(700px 360px at 10% -160px, rgb(var(--accent) / 0.09), transparent 70%);
+  background-repeat: no-repeat;
+}
+/* Grid items may shrink below their content width (prevents overflow on small phones) */
+.grid > * {
+  min-width: 0;
+}
+/* Brand-coloured text uses a lighter tint in dark mode for contrast */
+.text-brand {
+  color: rgb(var(--brand-text));
+}
+body {
   font-family: "Plus Jakarta Sans Variable", system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   -webkit-tap-highlight-color: transparent;
 }
-:root {
-  --font-sans: "Plus Jakarta Sans Variable";
-  --font-display: "Bricolage Grotesque Variable";
-}
 
 @layer components {
   .card {
-    @apply rounded-2xl border border-line bg-surface shadow-card;
+    @apply min-w-0 rounded-2xl border border-line/80 bg-surface shadow-card;
   }
   .input {
     @apply h-10 w-full rounded-xl border border-line bg-surface px-3 text-sm text-ink outline-none transition placeholder:text-muted/70 focus:border-brand focus:ring-4 focus:ring-brand/15 disabled:opacity-60;
@@ -159,6 +183,22 @@ body {
 }
 .safe-bottom {
   padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Short landscape phones: give the content the height — the menu button opens navigation */
+@media (max-height: 500px) and (orientation: landscape) and (max-width: 1023px) {
+  .mobile-nav {
+    display: none;
+  }
+  .app-main {
+    padding-bottom: 1.5rem;
+  }
+  .inbox-shell {
+    height: calc(100dvh - 4rem);
+  }
+  .inbox-wrap {
+    margin-bottom: -1.5rem;
+  }
 }
 
 @media print {
