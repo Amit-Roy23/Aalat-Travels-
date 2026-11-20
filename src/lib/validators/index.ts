@@ -138,7 +138,7 @@ export const TourInput = z
 
 export const InvoiceInput = z
   .object({
-    customer: z.string().min(1, "Select a customer"),
+    customer: z.string().optional().nullable(),
     lead: z.string().optional().nullable(),
     tripTitle: optStr(200),
     tour: TourInput.optional(),
@@ -152,6 +152,7 @@ export const InvoiceInput = z
     terms: optStr(4000),
     state: z.enum(["draft", "issued"]).default("issued"),
   })
+  .refine((v) => v.customer || v.lead, { message: "Choose the customer (or lead) to bill", path: ["customer"] })
   .refine((v) => v.dueDate.getTime() >= new Date(v.issueDate).setHours(0, 0, 0, 0), { message: "Due date cannot be before the issue date", path: ["dueDate"] });
 
 export const PaymentInput = z.object({

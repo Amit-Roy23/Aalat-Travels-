@@ -1,6 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { body, escapeRegex, HttpError, oid, paging, requireUser, route, searchParams } from "@/lib/api";
+import type { Types } from "mongoose";
 import { Customer, Invoice, Lead } from "@/lib/models";
+import { canAccessLead, convertLead } from "@/lib/services/leads";
 import { InvoiceInput } from "@/lib/validators";
 import { cleanTour, computeTotals, nextInvoiceNumber, recalc, refreshOverdue, shareToken } from "@/lib/services/invoices";
 import { getSettings } from "@/lib/services/settings";
@@ -39,16 +41,28 @@ export const GET = route(async (req) => {
 export const POST = route(async (req) => {
   const user = await requireUser();
   const data = await body(req, InvoiceInput);
-  const customer = await Customer.findById(oid(data.customer), { _id: 1, name: 1 }).lean();
-  if (!customer) throw new HttpError(400, "Selected customer not found.");
-  if (data.lead && !(await Lead.exists({ _id: oid(data.lead) }))) throw new HttpError(400, "Linked lead not found.");
+  // Validate amounts first, so nothing is changed if the invoice itself is invalid.
   const totals = computeTotals(data.items, data.discount, data.taxRate);
   if (totals.total <= 0) throw new HttpError(400, "Invoice total must be greater than zero.");
+
+  const lead = data.lead ? await Lead.findById(oid(data.lead)) : null;
+  if (data.lead && !lead) throw new HttpError(400, "Linked lead not found.");
+  let customer: { _id: Types.ObjectId; name: string } | null = null;
+  if (data.customer) {
+    customer = await Customer.findById(oid(data.customer), { _id: 1, name: 1 }).lean();
+    if (!customer) throw new HttpError(400, "Selected customer not found.");
+  } else if (lead) {
+    // Billing a lead directly: reuse its customer profile, or convert the lead into a customer now.
+    if (!(await canAccessLead(user, lead))) throw new HttpError(403, "This lead is assigned to another team member.");
+    const c = lead.customer ? await Customer.findById(lead.customer, { _id: 1, name: 1 }).lean() : null;
+    customer = c ?? (await convertLead(lead, user._id));
+  }
+  if (!customer) throw new HttpError(400, "Choose the customer (or lead) to bill.");
   const s = await getSettings();
   const inv = new Invoice({
     number: await nextInvoiceNumber({ style: s.invoice?.numberStyle, prefix: s.invoice?.prefix, startNumber: s.invoice?.startNumber }, data.issueDate),
     customer: customer._id,
-    lead: data.lead ? oid(data.lead) : undefined,
+    lead: lead?._id,
     tripTitle: data.tripTitle || data.tour?.name || "",
     tour: cleanTour(data.tour),
     taxType: data.taxType ?? s.invoice?.taxType ?? "cgst_sgst",

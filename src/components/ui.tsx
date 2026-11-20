@@ -280,7 +280,7 @@ export function UiProvider({ children }: { children: ReactNode }) {
   return (
     <UiCtx.Provider value={{ toast, confirm }}>
       {children}
-      <div className="pointer-events-none fixed inset-x-0 bottom-20 z-[90] flex flex-col items-center gap-2 px-4 lg:bottom-6 lg:items-end lg:pr-6">
+      <div className="pointer-events-none fixed inset-x-0 top-[4.5rem] z-[90] flex flex-col items-center gap-2 px-4 lg:items-end lg:pr-6">
         {toasts.map((t) => (
           <div key={t.id} className="pointer-events-auto flex max-w-sm animate-fade-up items-start gap-2.5 rounded-2xl border border-line bg-surface px-4 py-3 text-sm font-medium shadow-pop">
             {t.kind === "success" ? <CheckCircle2 className="mt-px h-[18px] w-[18px] shrink-0 text-leaf" /> : t.kind === "error" ? <AlertTriangle className="mt-px h-[18px] w-[18px] shrink-0 text-coral" /> : <Info className="mt-px h-[18px] w-[18px] shrink-0 text-sky" />}

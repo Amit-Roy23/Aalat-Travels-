@@ -220,7 +220,7 @@ export function LeadFormModal({ open, onClose, onSaved, lead }: { open: boolean;
 
 /* ───────── Entity picker (lead or customer) ───────── */
 type Picked = { kind: "lead" | "customer"; id: string; name: string; phone?: string };
-export function EntityPicker({ value, onChange, kinds = ["lead", "customer"] }: { value: Picked | null; onChange: (v: Picked | null) => void; kinds?: ("lead" | "customer")[] }) {
+export function EntityPicker({ value, onChange, kinds = ["lead", "customer"], invalid, footer }: { value: Picked | null; onChange: (v: Picked | null) => void; kinds?: ("lead" | "customer")[]; invalid?: boolean; footer?: (query: string) => React.ReactNode }) {
   const [q, setQ] = useState("");
   const [dq, setDq] = useState("");
   useEffect(() => {
@@ -250,11 +250,12 @@ export function EntityPicker({ value, onChange, kinds = ["lead", "customer"] }: 
     <div>
       <div className="relative">
         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
-        <input className="input pl-9" value={q} onChange={(e) => setQ(e.target.value)} placeholder={`Search ${kinds.join(" or ")} by name or phone…`} />
+        <input className={cn("input pl-9", invalid && "border-coral ring-4 ring-coral/15")} value={q} onChange={(e) => setQ(e.target.value)} placeholder={`Search ${kinds.join(" or ")} by name or phone…`} aria-invalid={invalid || undefined} />
       </div>
       {dq.length >= 2 && (
         <div className="mt-1.5 max-h-52 overflow-y-auto rounded-xl border border-line">
-          {results.length === 0 && <p className="px-3 py-3 text-sm text-muted">No matches</p>}
+          {results.length === 0 && data && <p className="px-3 py-3 text-sm text-muted">No matches for “{dq}”</p>}
+          {!data && <p className="px-3 py-3 text-sm text-muted">Searching…</p>}
           {results.map((r) => (
             <button key={r.kind + r.id} onClick={() => onChange(r)} className="flex w-full items-center justify-between border-b border-line px-3 py-2 text-left last:border-0 hover:bg-surface-2">
               <span>
@@ -266,6 +267,7 @@ export function EntityPicker({ value, onChange, kinds = ["lead", "customer"] }: 
           ))}
         </div>
       )}
+      {footer?.(dq)}
     </div>
   );
 }
@@ -411,7 +413,7 @@ export type CustomerLike = {
   preferences?: { destinations?: string[]; travelStyle?: string; hotelCategory?: string; mealPreference?: string; budgetRange?: string; notes?: string };
 };
 
-export function CustomerFormModal({ open, onClose, onSaved, customer }: { open: boolean; onClose: () => void; onSaved?: (id: string) => void; customer?: CustomerLike }) {
+export function CustomerFormModal({ open, onClose, onSaved, customer, initialName }: { open: boolean; onClose: () => void; onSaved?: (id: string, name: string, phone: string) => void; customer?: CustomerLike; initialName?: string }) {
   const { toast } = useUi();
   const blank = { name: "", phone: "", altPhone: "", email: "", city: "", address: "", dob: "", anniversary: "", gstin: "", tags: "", destinations: "", travelStyle: "", hotelCategory: "", mealPreference: "", budgetRange: "", notes: "" };
   const [f, setF] = useState(blank);
@@ -443,7 +445,7 @@ export function CustomerFormModal({ open, onClose, onSaved, customer }: { open: 
             budgetRange: c.preferences?.budgetRange ?? "",
             notes: c.preferences?.notes ?? "",
           }
-        : blank,
+        : { ...blank, name: initialName ?? "" },
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, customer]);
@@ -467,10 +469,10 @@ export function CustomerFormModal({ open, onClose, onSaved, customer }: { open: 
         tags: list(f.tags),
         preferences: { destinations: list(f.destinations), travelStyle: f.travelStyle, hotelCategory: f.hotelCategory, mealPreference: f.mealPreference, budgetRange: f.budgetRange, notes: f.notes },
       };
-      const res = customer?._id ? await api<{ customer: { _id: string } }>(`/api/customers/${customer._id}`, { method: "PATCH", body }) : await api<{ customer: { _id: string } }>(`/api/customers${force ? "?force=1" : ""}`, { body });
+      const res = customer?._id ? await api<{ customer: { _id: string; name: string; phone: string } }>(`/api/customers/${customer._id}`, { method: "PATCH", body }) : await api<{ customer: { _id: string; name: string; phone: string } }>(`/api/customers${force ? "?force=1" : ""}`, { body });
       toast(customer?._id ? "Customer updated" : "Customer created");
       onClose();
-      onSaved?.(res.customer._id);
+      onSaved?.(res.customer._id, res.customer.name, res.customer.phone);
     } catch (e) {
       if (e instanceof ApiError && e.status === 409 && e.data.duplicateId) setDup(String(e.data.duplicateId));
       setErr((e as Error).message);
