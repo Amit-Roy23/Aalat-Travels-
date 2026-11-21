@@ -28,7 +28,7 @@
   --shadow: 60 20 40;
   --sidebar: 31 11 22;
   --sidebar-2: 58 14 35;
-  --accent: 232 170 66;
+  --accent: 248 192 11;
   --hl: 251 113 133;
   --series-1: #2a78d6;
   --series-2: #eb6834;
@@ -63,7 +63,7 @@
   --shadow: 0 0 0;
   --sidebar: 12 6 10;
   --sidebar-2: 38 9 24;
-  --accent: 240 185 85;
+  --accent: 250 200 40;
   --hl: 251 113 133;
   --series-1: #3987e5;
   --series-2: #d95926;
@@ -97,7 +97,7 @@
     --shadow: 0 0 0;
     --sidebar: 12 6 10;
     --sidebar-2: 38 9 24;
-    --accent: 240 185 85;
+    --accent: 250 200 40;
     --hl: 251 113 133;
     --series-1: #3987e5;
     --series-2: #d95926;
@@ -232,6 +232,18 @@ body {
   .print-area * {
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
+  }
+  /* standalone print views: invoice flows normally, at printable A4 width, scaled to one page */
+  .fit-page {
+    width: 733px !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    zoom: var(--fit, 1);
+  }
+  .fit-page .print-area {
+    position: static !important;
+    width: 100% !important;
   }
   .classic-invoice {
     max-width: none !important;

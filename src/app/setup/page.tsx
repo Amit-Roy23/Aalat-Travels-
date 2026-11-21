@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { Rocket } from "lucide-react";
 import { api } from "@/lib/client";
 import { Button, Field } from "@/components/ui";
-import { LogoMark } from "@/components/logo";
+import { LogoSeal } from "@/components/logo";
 import { AuthArt } from "../login/auth-art";
 
 export default function SetupPage() {
@@ -34,7 +34,7 @@ export default function SetupPage() {
       <AuthArt />
       <div className="flex items-center justify-center px-5 py-12">
         <form onSubmit={submit} className="w-full max-w-sm">
-          <LogoMark className="mb-6 h-11 w-11 lg:hidden" />
+          <LogoSeal className="mx-auto mb-6 h-24 w-24 shadow-card lg:hidden" />
           <span className="chip bg-brand-soft text-brand-ink">First-time setup</span>
           <h1 className="mt-3 font-display text-3xl font-extrabold tracking-tight">Create your admin account</h1>
           <p className="mt-1.5 text-sm text-muted">This runs once. You can add your sales team afterwards.</p>

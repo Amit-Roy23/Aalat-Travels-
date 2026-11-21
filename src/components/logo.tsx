@@ -1,22 +1,13 @@
-import { useId } from "react";
 import { cn } from "@/lib/format";
 
+/** Official Aalat emblem on a white tile (reads well on light and dark backgrounds). */
 export function LogoMark({ className }: { className?: string }) {
-  const gid = "lm" + useId().replace(/:/g, "");
-  return (
-    <svg viewBox="0 0 64 64" className={cn("h-9 w-9", className)} aria-hidden>
-      <defs>
-        <linearGradient id={gid} x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#E11D48" />
-          <stop offset="1" stopColor="#881337" />
-        </linearGradient>
-      </defs>
-      <rect width="64" height="64" rx="16" fill={`url(#${gid})`} />
-      <path d="M14 45 31 14h3l16 31h-7l-3.6-7H24l-3.5 7z" fill="#fff" />
-      <path d="M26.7 32.5h10.2L31.8 22z" fill="#BE123C" />
-      <path d="M9 41c10-4 27-6.5 46-15l-6 8.5c-11 4-25 6.5-40 6.5z" fill="#E8AA42" />
-    </svg>
-  );
+  return <img src="/brand/aalat-icon.png" alt="Aalat Travels" width={36} height={36} className={cn("h-9 w-9 shrink-0 rounded-[10px] shadow-sm ring-1 ring-black/5", className)} />;
+}
+
+/** Full round Aalat seal ("Aalat Travels & Events"). */
+export function LogoSeal({ className }: { className?: string }) {
+  return <img src="/brand/aalat-seal.png" alt="Aalat Travels & Events" className={cn("h-24 w-24 rounded-full", className)} />;
 }
 
 export function Logo({ name = "Aalat Travels", light }: { name?: string; light?: boolean }) {

@@ -6,7 +6,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: { default: "Aalat Travels CRM", template: "%s · Aalat Travels" },
   description: "Lead management, customers, follow-ups, invoicing and AI-powered WhatsApp automation for Aalat Travels.",
-  icons: { icon: "/icon.svg" },
+  icons: { icon: "/brand/favicon-64.png", apple: "/brand/apple-icon.png" },
 };
 
 export const viewport: Viewport = {

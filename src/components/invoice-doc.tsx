@@ -1,6 +1,5 @@
 import { cn, displayPhone, fmtDate, money } from "@/lib/format";
 import { invoiceStatusMeta, paymentMethodLabel } from "@/lib/constants";
-import { LogoMark } from "./logo";
 
 export type InvoiceDocData = {
   number: string;
@@ -34,7 +33,7 @@ export function InvoiceDocument({ inv, company, bank, className }: { inv: Invoic
         <div className="absolute -right-10 -top-16 h-48 w-48 rounded-full bg-hl/20 blur-2xl" />
         <div className="relative flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex items-center gap-3">
-            {company.logo ? <img src={company.logo} alt="" className="h-12 w-12 rounded-full bg-white object-contain" /> : <LogoMark className="h-12 w-12" />}
+            <img src={company.logo || "/brand/aalat-seal.png"} alt="" className="h-14 w-14 rounded-full bg-white object-contain" />
             <div>
               <p className="font-display text-2xl font-extrabold tracking-tight">{company.name || "Aalat Travels"}</p>
               {company.tagline && <p className="text-sm text-white/60">{company.tagline}</p>}

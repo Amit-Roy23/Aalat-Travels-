@@ -114,9 +114,9 @@ export default function SettingsPage() {
               <Field label="Corporate office address" className="sm:col-span-2">
                 <textarea className="input" rows={2} value={s.company.address ?? ""} onChange={(e) => set("company", { address: e.target.value })} />
               </Field>
-              <Field label="Logo (printed on invoices)" className="sm:col-span-2" hint="PNG / JPG / WebP. It is resized automatically. Without a logo, a round emblem with the company name is used.">
+              <Field label="Logo (printed on invoices)" className="sm:col-span-2" hint="The official Aalat seal is used by default. Upload a PNG / JPG / WebP only to replace it (resized automatically).">
                 <div className="flex items-center gap-3">
-                  {s.company.logo ? <img src={s.company.logo} alt="Logo" className="h-16 w-16 rounded-full border border-line bg-white object-contain" /> : <span className="flex h-16 w-16 items-center justify-center rounded-full border border-dashed border-line text-[10px] text-muted">No logo</span>}
+                  <img src={s.company.logo || "/brand/aalat-seal.png"} alt="Logo" className="h-16 w-16 rounded-full border border-line bg-white object-contain" />
                   <label className="cursor-pointer rounded-xl border border-line px-3 py-2 text-sm font-semibold hover:bg-surface-2">
                     Upload
                     <input type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" onChange={async (e) => {

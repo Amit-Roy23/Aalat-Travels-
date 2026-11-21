@@ -326,7 +326,7 @@ function Notifications() {
       seen.current.add(i.id);
       if (perm === "granted") {
         try {
-          const n = new Notification(i.title, { body: i.body, icon: "/icon.svg", tag: i.id });
+          const n = new Notification(i.title, { body: i.body, icon: "/brand/favicon-64.png", tag: i.id });
           n.onclick = () => {
             window.focus();
             if (i.link) router.push(i.link);
