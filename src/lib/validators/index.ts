@@ -201,3 +201,40 @@ export const ItineraryInput = z.object({
   notes: optStr(4000),
   status: z.enum(["draft", "sent", "confirmed"]).default("draft"),
 });
+
+/* ───────── Staff ───────── */
+const hhmm = z.union([z.literal(""), z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Use HH:MM time")]);
+export const StaffInput = z.object({
+  name: str(120).min(2, "Name is required"),
+  phone,
+  type: z.enum(["office", "tour_manager", "driver", "cook", "helper", "guide", "other"]).default("office"),
+  designation: optStr(80),
+  salaryType: z.enum(["monthly", "daily"]).default("monthly"),
+  salary: z.coerce.number().min(0).max(1e7).default(0),
+  joinDate: z.union([z.literal(""), z.null(), z.coerce.date()]).optional(),
+  user: z.string().optional().nullable(),
+  bankDetails: optStr(500),
+  upiId: optStr(100),
+  active: z.boolean().default(true),
+  notes: optStr(1000),
+});
+export const AttendanceInput = z
+  .object({
+    staff: z.string().min(1),
+    date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date"),
+    status: z.enum(["present", "half_day", "leave", "absent", "holiday", "week_off"]),
+    leaveType: z.enum(["casual", "sick", "paid", "unpaid", ""]).optional().default(""),
+    inTime: hhmm.optional().default(""),
+    outTime: hhmm.optional().default(""),
+    note: optStr(300),
+  })
+  .refine((v) => v.status !== "leave" || v.leaveType, { message: "Choose the leave type", path: ["leaveType"] })
+  .refine((v) => !(v.inTime && v.outTime) || v.outTime > v.inTime, { message: "Out time must be after in time", path: ["outTime"] });
+export const AdvanceInput = z.object({ amount: z.coerce.number().min(1, "Enter an amount").max(1e7), date: z.coerce.date(), note: optStr(200) });
+export const PayrollPatch = z.object({
+  allowances: z.coerce.number().min(0).max(1e7).optional(),
+  bonus: z.coerce.number().min(0).max(1e7).optional(),
+  advanceDeduction: z.coerce.number().min(0).max(1e7).optional(),
+  otherDeduction: z.coerce.number().min(0).max(1e7).optional(),
+  note: str(300).optional(),
+});

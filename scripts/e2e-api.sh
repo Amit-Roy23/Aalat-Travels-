@@ -143,6 +143,39 @@ check "status -> not_interested" $(echo "$S3" | jq_ "d['lead']['status']") not_i
 check "auto follow-ups cancelled" $(echo "$S3" | jq_ "len([f for f in d['followUps'] if f['status']=='pending'])") 0
 check "sandbox reset" $(code -X DELETE "$B/api/ai/simulate?phone=$SP") 200
 
+echo "Staff, attendance & payroll"
+SEMAIL="staff$(date +%s%N | tail -c 7)@test.aalat"
+PRIYA=$(req -d "{\"name\":\"Test Staff\",\"email\":\"$SEMAIL\",\"password\":\"Staff@1234\",\"role\":\"agent\"}" $B/api/users | jq_ "d['user']['_id']")
+SID=$(req -d "{\"name\":\"Test Staff\",\"type\":\"office\",\"salaryType\":\"monthly\",\"salary\":26000,\"user\":\"$PRIYA\",\"joinDate\":\"2025-01-01\"}" $B/api/staff | jq_ "d['staff']['_id']")
+check "staff created + linked to login" $([ -n "$SID" ] && echo ok) ok
+check "same login can't be linked twice" $(code -d "{\"name\":\"Dup\",\"user\":\"$PRIYA\"}" $B/api/staff) 409
+AG=$(mktemp); curl -s -c $AG -H 'content-type: application/json' -d "{\"email\":\"$SEMAIL\",\"password\":\"Staff@1234\"}" $B/api/auth/login >/dev/null
+agent(){ curl -s -b $AG -H 'content-type: application/json' "$@"; }
+agentcode(){ curl -s -o /dev/null -w "%{http_code}" -b $AG -H 'content-type: application/json' "$@"; }
+check "agent check-in" $(agent -d '{"action":"in"}' $B/api/attendance/me | jq_ "d['record']['status']+'/'+str(bool(d['record']['inTime']))") present/True
+check "double check-in blocked" $(agentcode -d '{"action":"in"}' $B/api/attendance/me) 409
+check "agent check-out" $(agent -d '{"action":"out"}' $B/api/attendance/me | jq_ "bool(d['record']['outTime'])") True
+LF=$(date -d '+3 days' +%Y-%m-%d); LT=$(date -d '+9 days' +%Y-%m-%d)
+check "leave request (weekly offs skipped)" $(agent -d "{\"action\":\"leave\",\"from\":\"$LF\",\"to\":\"$LT\",\"leaveType\":\"casual\",\"note\":\"Family function\"}" $B/api/attendance/me | jq_ "d['days']") 6
+check "agent cannot open payroll" $(agentcode $B/api/payroll) 403
+check "agent cannot edit others' attendance" $(agentcode -X PUT -d "{\"staff\":\"$SID\",\"date\":\"$TODAY\",\"status\":\"absent\"}" $B/api/attendance) 403
+LIDS=$(req $B/api/attendance/leaves | jq_ "','.join(r['_id'] for r in d['items'] if r['staff']['_id']=='$SID')")
+check "admin approves leave" $(req -X PATCH -d "{\"ids\":[\"$(echo $LIDS | sed 's/,/","/g')\"],\"approval\":\"approved\"}" $B/api/attendance/leaves | jq_ "d['updated']") 6
+check "out-before-in rejected" $(code -X PUT -d "{\"staff\":\"$SID\",\"date\":\"$TODAY\",\"status\":\"present\",\"inTime\":\"18:00\",\"outTime\":\"10:00\"}" $B/api/attendance) 400
+check "future attendance rejected" $(code -X PUT -d "{\"staff\":\"$SID\",\"date\":\"$NEXT\",\"status\":\"present\"}" $B/api/attendance) 400
+check "late flagged (11:05 > 10:00+15m)" $(req -X PUT -d "{\"staff\":\"$SID\",\"date\":\"$TODAY\",\"status\":\"present\",\"inTime\":\"11:05\",\"outTime\":\"19:00\"}" $B/api/attendance | jq_ "d['record']['late']") True
+LM=$(date -d "$(date +%Y-%m-01) -1 day" +%Y-%m)
+check "advance recorded" $(req -d '{"amount":5000,"date":"'$TODAY'","note":"Festival"}' $B/api/staff/$SID/advances | jq_ "d['advance']['amount']") 5000
+check "payroll generated for last month" $(req -d "{\"month\":\"$LM\"}" $B/api/payroll | jq_ "d['created']>0") True
+PR=$(req "$B/api/payroll?month=$LM" | jq_ "next(r['_id'] for r in d['items'] if r['staff']['_id']=='$SID')")
+check "advance auto-deducted (capped by earned)" $(req "$B/api/payroll?month=$LM" | jq_ "next(r['advanceDeduction'] for r in d['items'] if r['_id']=='$PR')") 0
+check "over-recovery blocked" $(code -X PATCH -d '{"advanceDeduction":6000,"bonus":40000}' $B/api/payroll/$PR) 400
+check "adjust: bonus + 5000 advance recovery" $(req -X PATCH -d '{"bonus":40000,"advanceDeduction":5000}' $B/api/payroll/$PR | jq_ "d['payroll']['net']==d['payroll']['earned']+40000-5000") True
+check "mark paid → advance recovered" $(req -d "{\"date\":\"$TODAY\",\"method\":\"upi\"}" $B/api/payroll/$PR/pay >/dev/null; req $B/api/staff/$SID/advances | jq_ "d['items'][0]['recovered']") 5000
+check "paid payroll locked" $(code -X PATCH -d '{"bonus":1}' $B/api/payroll/$PR) 409
+check "advance with recovery can't be deleted" $(code -X DELETE $B/api/staff/advances/$(req $B/api/staff/$SID/advances | jq_ "d['items'][0]['_id']")) 409
+check "reopen → advance restored" $(req -X POST $B/api/payroll/$PR/reopen >/dev/null; req $B/api/staff/$SID/advances | jq_ "d['items'][0]['recovered']") 0
+check "future payroll month rejected" $(code -d '{"month":"2099-01"}' $B/api/payroll) 400
 echo "Agent permissions"
 cp $J $A; J=$(mktemp)
 check "agent login" $(code -d '{"email":"priya@demo.aalattravels.in","password":"Demo@1234"}' $B/api/auth/login) 200

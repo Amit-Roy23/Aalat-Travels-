@@ -103,3 +103,24 @@ export function startOfTodayTZ(now = new Date()) {
 export function addDays(d: Date, n: number) {
   return new Date(d.getTime() + n * 86400000);
 }
+
+/** "HH:MM" in India time (for time inputs). */
+export function hhmmIST(d?: string | Date | null) {
+  if (!d) return "";
+  const date = typeof d === "string" ? new Date(d) : d;
+  return new Intl.DateTimeFormat("en-GB", { timeZone: APP_TZ, hour: "2-digit", minute: "2-digit", hour12: false }).format(date);
+}
+/** Today's date key "YYYY-MM-DD" in India time. */
+export function todayKeyIST(d: Date = new Date()) {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: APP_TZ, year: "numeric", month: "2-digit", day: "2-digit" }).format(d);
+}
+export function shiftDay(key: string, n: number) {
+  const [y, m, d] = key.split("-").map(Number);
+  const t = new Date(Date.UTC(y, m - 1, d + n));
+  return t.toISOString().slice(0, 10);
+}
+export function hoursBetween(a?: string | Date | null, b?: string | Date | null) {
+  if (!a || !b) return null;
+  const h = (new Date(b).getTime() - new Date(a).getTime()) / 3600000;
+  return h > 0 ? Math.round(h * 10) / 10 : null;
+}

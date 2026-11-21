@@ -49,13 +49,14 @@ const Schema = z.object({
     .partial()
     .optional(),
   leads: z.object({ autoAssign: z.enum(["none", "round_robin"]) }).partial().optional(),
+  payroll: z.object({ weeklyOff: z.array(z.number().int().min(0).max(6)).max(6), officeStart: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Use HH:MM"), graceMinutes: z.coerce.number().int().min(0).max(240), unmarkedAs: z.enum(["absent", "present"]) }).partial().optional(),
 });
 
 export const PATCH = route(async (req) => {
   await requireUser("admin");
   const data = await body(req, Schema);
   const st = await getSettings();
-  for (const section of ["company", "invoice", "ai", "leads"] as const) {
+  for (const section of ["company", "invoice", "ai", "leads", "payroll"] as const) {
     const v = data[section];
     if (!v) continue;
     for (const [k, val] of Object.entries(v)) st.set(`${section}.${k}`, val);
