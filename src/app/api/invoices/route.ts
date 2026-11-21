@@ -67,6 +67,7 @@ export const POST = route(async (req) => {
     tour: cleanTour(data.tour),
     taxType: data.taxType ?? s.invoice?.taxType ?? "cgst_sgst",
     remarks: data.remarks ?? "",
+    installments: data.installments ?? [],
     issueDate: data.issueDate,
     dueDate: data.dueDate,
     ...totals,

@@ -1,6 +1,8 @@
 import { cn, displayPhone, fmtDate, money } from "@/lib/format";
 import { invoiceStatusMeta, paymentMethodLabel } from "@/lib/constants";
 import { PartnerLogos, type ClassicSettings } from "./invoice-classic";
+import { PayQr } from "./pay-qr";
+import { allocateInstallments } from "@/lib/installments";
 
 export type InvoiceDocData = {
   number: string;
@@ -22,6 +24,7 @@ export type InvoiceDocData = {
   payments?: { amount: number; date: string; method: string }[];
   taxType?: string;
   remarks?: string;
+  installments?: { _id?: string; label: string; percent: number; dueDate: string; amount?: number }[];
   tour?: { name?: string; duration?: string; adults?: number; children?: number; rooms?: number; startDate?: string; endDate?: string; startPoint?: string; endPoint?: string; foodPlan?: string; propertyType?: string; vehicleSeat?: string; vehicleType?: string };
 };
 export type CompanyData = { name?: string; tagline?: string; phone?: string; email?: string; website?: string; address?: string; gstin?: string; regNo?: string; logo?: string };
@@ -207,15 +210,39 @@ export function InvoiceDocument({ inv, company, bank, className }: { inv: Invoic
             </ul>
           </div>
         )}
-        {(bank?.bankDetails || bank?.upiId) && inv.balance > 0 && (
-          <div className="mt-6 rounded-xl border border-[#e6e1d7] p-4 text-sm">
-            <p className="mb-1 text-[10.5px] font-bold uppercase tracking-wider text-[#6b7078]">How to pay</p>
-            {bank.upiId && (
-              <p>
-                <b>UPI:</b> {bank.upiId}
-              </p>
-            )}
-            {bank.bankDetails && <p className="whitespace-pre-line">{bank.bankDetails}</p>}
+        {!!inv.installments?.length && (
+          <div className="mt-6">
+            <p className="text-[10.5px] font-bold uppercase tracking-wider text-[#6b7078]">Payment schedule</p>
+            <table className="mt-1.5 w-full text-sm">
+              <tbody>
+                {allocateInstallments(inv.total, inv.installments, inv.amountPaid).map((r, i) => (
+                  <tr key={i} className="border-b border-dashed border-[#e6e1d7]">
+                    <td className="py-1.5">
+                      {r.label} <span className="text-[#6b7078]">({r.percent}%)</span>
+                    </td>
+                    <td className="py-1.5 text-[#52575f]">by {fmtDate(r.dueDate)}</td>
+                    <td className="py-1.5 text-right font-semibold tabular-nums">{money(r.amount)}</td>
+                    <td className={cn("w-24 py-1.5 text-right text-xs font-bold", r.status === "paid" ? "text-[#228F52]" : r.status === "overdue" ? "text-[#C80E16]" : "text-[#B58600]")}>
+                      {r.status === "paid" ? "✓ Paid" : r.status === "partial" ? `Paid ${money(r.paid)}` : r.status === "overdue" ? "Overdue" : "Due"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        {inv.balance > 0 && inv.status !== "draft" && inv.status !== "cancelled" && (bank?.bankDetails || bank?.upiId || bank?.paymentQr) && (
+          <div className="mt-6 flex items-start gap-4 rounded-xl border border-[#e6e1d7] p-4 text-sm">
+            <div className="min-w-0 flex-1">
+              <p className="mb-1 text-[10.5px] font-bold uppercase tracking-wider text-[#6b7078]">How to pay</p>
+              {bank.upiId && (
+                <p>
+                  <b>UPI:</b> {bank.upiId}
+                </p>
+              )}
+              {bank.bankDetails && <p className="whitespace-pre-line">{bank.bankDetails}</p>}
+            </div>
+            <PayQr settings={{ ...bank, companyName: company.name }} amount={inv.balance} invoiceNumber={inv.number} size={96} accent="#1F0B16" />
           </div>
         )}
         {inv.remarks?.trim() && (

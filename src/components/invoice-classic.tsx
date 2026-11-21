@@ -6,6 +6,8 @@ import { displayPhone, fmtDate, money } from "@/lib/format";
 import { INVOICE_DEFAULTS } from "@/lib/invoice-defaults";
 import { invoiceStatusMeta } from "@/lib/constants";
 import type { CompanyData, InvoiceDocData } from "./invoice-doc";
+import { PayQr } from "./pay-qr";
+import { allocateInstallments } from "@/lib/installments";
 
 export type ClassicSettings = {
   cancellationPolicy?: string;
@@ -16,6 +18,9 @@ export type ClassicSettings = {
   bankDetails?: string;
   upiId?: string;
   showPartnerLogos?: boolean;
+  paymentQr?: string;
+  showPaymentQr?: boolean;
+  autoUpiQr?: boolean;
   partnerTitle?: string;
   partnerLogos?: { name: string; src: string }[];
 };
@@ -240,6 +245,26 @@ export function ClassicInvoice({ inv, company, settings, className = "" }: { inv
         </div>
       </div>
 
+      {/* Part-payment schedule */}
+      {!!inv.installments?.length && (
+        <div className="border-t-[1.5px] px-3 py-1.5 sm:px-5" style={{ borderColor: RED }}>
+          <p className="mb-0.5 font-bold" style={{ color: RED }}>
+            Payment Schedule:
+          </p>
+          <div className="grid grid-cols-1 gap-x-4 gap-y-0.5 text-[0.95em] min-[480px]:grid-cols-3">
+            {allocateInstallments(inv.total, inv.installments, inv.amountPaid).map((r, i) => (
+              <p key={i} className="flex items-baseline gap-1">
+                <span style={{ color: YEL }}>♦</span>
+                <span>
+                  <b>{r.label}</b> ({r.percent}%) {money(r.amount)} · by {fmtDate(r.dueDate)}{" "}
+                  <b style={{ color: r.status === "paid" ? "#1d7a43" : r.status === "overdue" ? RED : GOLD }}>{r.status === "paid" ? "✓ Paid" : r.status === "partial" ? `Paid ${money(r.paid)}` : r.status === "overdue" ? "Overdue" : "Due"}</b>
+                </span>
+              </p>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Remarks */}
       <div className="flex items-start gap-1.5 border-t-[1.5px] px-3 py-1.5 sm:px-5" style={{ borderColor: RED }}>
         <span className="shrink-0 pt-px font-bold" style={{ color: RED }}>
@@ -283,13 +308,18 @@ export function ClassicInvoice({ inv, company, settings, className = "" }: { inv
           <p className="font-bold underline" style={{ color: RED }}>
             Payment Terms:
           </p>
-          <ol className="mt-0.5 space-y-px">
-            {terms.map((l, i) => (
-              <li key={l}>
-                {i + 1}. {l}
-              </li>
-            ))}
-          </ol>
+          <div className="flex items-start gap-3">
+            <ol className="mt-0.5 min-w-0 flex-1 space-y-px">
+              {terms.map((l, i) => (
+                <li key={l}>
+                  {i + 1}. {l}
+                </li>
+              ))}
+            </ol>
+            {inv.status !== "draft" && inv.status !== "cancelled" && (
+              <PayQr settings={{ ...settings, companyName: company.name }} amount={inv.balance} invoiceNumber={inv.number} size={84} accent={RED} hideUpi={!!settings.upiId} />
+            )}
+          </div>
           {(settings.upiId || settings.bankDetails) && inv.balance > 0 && (
             <p className="mt-1 whitespace-pre-line text-[#444]">
               {settings.upiId && <b>UPI: {settings.upiId}</b>}

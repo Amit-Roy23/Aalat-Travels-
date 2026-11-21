@@ -68,6 +68,25 @@ check "bad logo src rejected" $(code -X PATCH -d '{"invoice":{"partnerLogos":[{"
 RT=$(req $B/api/invoices/$RID | jq_ "d['invoice']['shareToken']")
 check "public link has remarks + logos" $(curl -s $B/api/public/invoices/$RT | jq_ "d['invoice']['remarks']+'/'+str(len(d['invoiceSettings']['partnerLogos']))") Cake_included/7
 check "logo images public" $(curl -s -o /dev/null -w "%{http_code}" $B/brand/partners/jk-tourism.png) 200
+echo "Part payments (instalments)"
+PAST=$(date -d '-10 days' +%Y-%m-%d); P5=$(date -d '-5 days' +%Y-%m-%d); F20=$(date -d '+20 days' +%Y-%m-%d); F40=$(date -d '+40 days' +%Y-%m-%d)
+check "percentages must total 100" $(code -d "{\"customer\":\"$CID\",\"issueDate\":\"$TODAY\",\"dueDate\":\"$NEXT\",\"installments\":[{\"label\":\"A\",\"percent\":30,\"dueDate\":\"$TODAY\"},{\"label\":\"B\",\"percent\":60,\"dueDate\":\"$NEXT\"}],\"items\":[{\"description\":\"Pkg\",\"quantity\":1,\"rate\":1000}]}" $B/api/invoices) 400
+check "instalment before issue date rejected" $(code -d "{\"customer\":\"$CID\",\"issueDate\":\"$TODAY\",\"dueDate\":\"$NEXT\",\"installments\":[{\"label\":\"A\",\"percent\":100,\"dueDate\":\"$PAST\"}],\"items\":[{\"description\":\"Pkg\",\"quantity\":1,\"rate\":1000}]}" $B/api/invoices) 400
+# issued 10 days ago: advance due 5 days ago (unpaid → overdue), interim +20d, final +40d
+PI=$(req -d "{\"customer\":\"$CID\",\"issueDate\":\"$PAST\",\"dueDate\":\"$F40\",\"taxRate\":5,\"installments\":[{\"label\":\"Advance\",\"percent\":30,\"dueDate\":\"$P5\"},{\"label\":\"Interim\",\"percent\":50,\"dueDate\":\"$F20\"},{\"label\":\"Final\",\"percent\":20,\"dueDate\":\"$F40\"}],\"items\":[{\"description\":\"Kashmir pkg\",\"quantity\":3,\"rate\":33333}]}" $B/api/invoices)
+PID=$(echo "$PI" | jq_ "d['invoice']['_id']")
+check "instalment amounts sum to total exactly" $(echo "$PI" | jq_ "round(sum(i['amount'] for i in d['invoice']['installments']),2)==d['invoice']['total']") True
+check "invoice due date = last instalment" $(echo "$PI" | jq_ "d['invoice']['dueDate'][:10]") $F40
+check "unpaid past-due advance → overdue" $(echo "$PI" | jq_ "d['invoice']['status']") overdue
+ADV=$(echo "$PI" | jq_ "d['invoice']['installments'][0]['amount']")
+check "paying the advance → partly paid" $(req -d "{\"amount\":$ADV,\"date\":\"$TODAY\",\"method\":\"upi\"}" $B/api/invoices/$PID/payments | jq_ "d['invoice']['status']") partial
+check "editing items rescales instalments" $(req -X PATCH -d '{"items":[{"description":"Kashmir pkg","quantity":3,"rate":40000}]}' $B/api/invoices/$PID | jq_ "round(sum(i['amount'] for i in d['invoice']['installments']),2)==d['invoice']['total'] and d['invoice']['installments'][0]['amount']==round(d['invoice']['total']*0.3,2)") True
+check "schedule removable" $(req -X PATCH -d '{"installments":[]}' $B/api/invoices/$PID | jq_ "len(d['invoice']['installments'])") 0
+echo "Payment QR settings"
+check "bad UPI id rejected" $(code -X PATCH -d '{"invoice":{"upiId":"not a upi"}}' $B/api/settings) 400
+check "UPI id + QR saved" $(req -X PATCH -d '{"invoice":{"upiId":"aalattravels@sbi","paymentQr":"data:image/png;base64,iVBORw0KGgo=","showPaymentQr":true}}' $B/api/settings | jq_ "d['settings']['invoice']['upiId']+'/'+str(d['settings']['invoice']['paymentQr'][:10])") aalattravels@sbi/data:image
+check "QR reaches the public link" $(curl -s $B/api/public/invoices/$(req $B/api/invoices/$PID | jq_ "d['invoice']['shareToken']") | jq_ "d['invoiceSettings']['paymentQr'][:10]") data:image
+req -X PATCH -d '{"invoice":{"paymentQr":""}}' $B/api/settings >/dev/null
 echo "Invoice for a lead (auto-convert)"
 LP="93$(shuf -i 10000000-99999999 -n1)"
 L2=$(req -d "{\"name\":\"Invoice Lead\",\"phone\":\"$LP\",\"destination\":\"Goa\"}" $B/api/leads | jq_ "d['lead']['_id']")

@@ -214,6 +214,11 @@ const InvoiceSchema = new Schema(
     },
     taxType: { type: String, enum: ["cgst_sgst", "igst"], default: "cgst_sgst" },
     remarks: { type: String, default: "" },
+    // Part-payment schedule: amounts are derived from percent × total (last instalment takes any rounding remainder)
+    installments: {
+      type: [new Schema({ label: { type: String, required: true }, percent: { type: Number, required: true, min: 0.01, max: 100 }, amount: { type: Number, default: 0 }, dueDate: { type: Date, required: true } }, { _id: true })],
+      default: [],
+    },
     issueDate: { type: Date, required: true },
     dueDate: { type: Date, required: true },
     items: { type: [InvoiceItemSchema], default: [] },
@@ -296,6 +301,9 @@ const SettingsSchema = new Schema(
       refundNote: { type: String, default: INVOICE_DEFAULTS.refundNote },
       footerNote: { type: String, default: INVOICE_DEFAULTS.footerNote },
       showPartnerLogos: { type: Boolean, default: true },
+      paymentQr: { type: String, default: "" }, // uploaded UPI / bank QR (data URL)
+      showPaymentQr: { type: Boolean, default: true },
+      autoUpiQr: { type: Boolean, default: true }, // generate a UPI QR for the amount due when no image is uploaded
       partnerDefaultsVersion: { type: Number, default: 0 },
       partnerTitle: { type: String, default: "" },
       partnerLogos: {
@@ -328,6 +336,12 @@ const SettingsSchema = new Schema(
       autoFollowUp: { type: Boolean, default: true },
       autoStatus: { type: Boolean, default: true },
     },
+    payroll: {
+      weeklyOff: { type: [Number], default: [0] }, // 0 = Sunday
+      officeStart: { type: String, default: "10:00" },
+      graceMinutes: { type: Number, default: 15, min: 0 },
+      unmarkedAs: { type: String, enum: ["absent", "present"], default: "absent" },
+    },
     leads: {
       autoAssign: { type: String, enum: ["none", "round_robin"], default: "round_robin" },
       lastAssignedIndex: { type: Number, default: -1 },
@@ -339,3 +353,5 @@ const SettingsSchema = new Schema(
 export const Settings = getModel("Settings", SettingsSchema);
 
 export { mongoose };
+
+export * from "./ops";

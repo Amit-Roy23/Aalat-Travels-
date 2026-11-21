@@ -136,6 +136,11 @@ export const TourInput = z
   })
   .refine((t) => !(t.startDate instanceof Date && t.endDate instanceof Date) || t.endDate >= t.startDate, { message: "Tour ending date cannot be before the starting date", path: ["endDate"] });
 
+export const InstallmentsInput = z
+  .array(z.object({ label: str(60).min(1, "Instalment name is required"), percent: z.coerce.number().min(0.01, "Each instalment needs a percentage").max(100), dueDate: z.coerce.date() }))
+  .max(8, "Up to 8 instalments")
+  .refine((l) => l.length === 0 || Math.abs(l.reduce((s, i) => s + i.percent, 0) - 100) < 0.01, { message: "Instalment percentages must add up to 100%" });
+
 export const InvoiceInput = z
   .object({
     customer: z.string().optional().nullable(),
@@ -144,6 +149,7 @@ export const InvoiceInput = z
     tour: TourInput.optional(),
     taxType: z.enum(["cgst_sgst", "igst"]).optional(),
     remarks: optStr(1000),
+    installments: InstallmentsInput.optional(),
     issueDate: z.coerce.date(),
     dueDate: z.coerce.date(),
     items: z.array(InvoiceItem).min(1, "Add at least one line item"),
@@ -154,6 +160,7 @@ export const InvoiceInput = z
     state: z.enum(["draft", "issued"]).default("issued"),
   })
   .refine((v) => v.customer || v.lead, { message: "Choose the customer (or lead) to bill", path: ["customer"] })
+  .refine((v) => (v.installments ?? []).every((i) => i.dueDate.getTime() >= new Date(v.issueDate).setHours(0, 0, 0, 0)), { message: "Instalment due dates cannot be before the issue date", path: ["installments"] })
   .refine((v) => v.dueDate.getTime() >= new Date(v.issueDate).setHours(0, 0, 0, 0), { message: "Due date cannot be before the issue date", path: ["dueDate"] });
 
 export const PaymentInput = z.object({

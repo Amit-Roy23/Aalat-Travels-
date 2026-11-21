@@ -136,3 +136,100 @@ export function languageName(code?: string | null) {
   if (!code) return "—";
   return LANGUAGE_NAMES[code] ?? code.toUpperCase();
 }
+
+/* ───────── Operations ───────── */
+export const EXPENSE_CATEGORIES = [
+  { value: "train", label: "Train tickets" },
+  { value: "flight_bus", label: "Flight / Bus tickets" },
+  { value: "gas", label: "Gas (cylinder)" },
+  { value: "grocery", label: "Grocery" },
+  { value: "fresh", label: "Fresh items (veg / fruits / dairy)" },
+  { value: "meat_fish", label: "Fish / Chicken / Mutton" },
+  { value: "fuel", label: "Fuel / Diesel" },
+  { value: "food", label: "Restaurant / Food" },
+  { value: "entry", label: "Entry tickets / Permits" },
+  { value: "guide", label: "Guide / Local help" },
+  { value: "misc", label: "Other / Miscellaneous" },
+] as const;
+export type ExpenseCategory = (typeof EXPENSE_CATEGORIES)[number]["value"];
+export const EXPENSE_CATEGORY_VALUES = EXPENSE_CATEGORIES.map((c) => c.value) as [ExpenseCategory, ...ExpenseCategory[]];
+export const expenseCategoryLabel = (v: string) => EXPENSE_CATEGORIES.find((c) => c.value === v)?.label ?? v;
+
+export const VENDOR_TYPES = [
+  { value: "hotel", label: "Hotel / Resort" },
+  { value: "transport", label: "Car / Transport" },
+  { value: "grocery", label: "Grocery / Provisions" },
+  { value: "fresh", label: "Fresh items / Meat & Fish" },
+  { value: "gas", label: "Gas supplier" },
+  { value: "tickets", label: "Train / Flight tickets" },
+  { value: "restaurant", label: "Restaurant / Caterer" },
+  { value: "guide", label: "Guide / Local agent" },
+  { value: "other", label: "Other" },
+] as const;
+export type VendorType = (typeof VENDOR_TYPES)[number]["value"];
+export const VENDOR_TYPE_VALUES = VENDOR_TYPES.map((c) => c.value) as [VendorType, ...VendorType[]];
+export const vendorTypeLabel = (v: string) => VENDOR_TYPES.find((c) => c.value === v)?.label ?? v;
+
+export const TOUR_STATUSES = [
+  { value: "planned", label: "Planned", tone: "sky" },
+  { value: "ongoing", label: "Ongoing", tone: "sun" },
+  { value: "completed", label: "Completed", tone: "leaf" },
+  { value: "cancelled", label: "Cancelled", tone: "slate" },
+] as const satisfies readonly { value: string; label: string; tone: Tone }[];
+export type TourStatus = (typeof TOUR_STATUSES)[number]["value"];
+export const TOUR_STATUS_VALUES = TOUR_STATUSES.map((s) => s.value) as [TourStatus, ...TourStatus[]];
+
+export const INVENTORY_UNITS = ["kg", "g", "litre", "ml", "piece", "packet", "dozen", "cylinder", "box", "bottle"] as const;
+export const INVENTORY_CATEGORIES = [
+  { value: "grocery", label: "Grocery" },
+  { value: "fresh", label: "Fresh items" },
+  { value: "meat_fish", label: "Fish / Chicken / Mutton" },
+  { value: "gas", label: "Gas" },
+  { value: "misc", label: "Other" },
+] as const;
+export type InventoryCategory = (typeof INVENTORY_CATEGORIES)[number]["value"];
+export const INVENTORY_CATEGORY_VALUES = INVENTORY_CATEGORIES.map((c) => c.value) as [InventoryCategory, ...InventoryCategory[]];
+
+/* ───────── Staff ───────── */
+export const STAFF_TYPES = [
+  { value: "office", label: "Office staff" },
+  { value: "tour_manager", label: "Tour manager" },
+  { value: "driver", label: "Driver" },
+  { value: "cook", label: "Cook" },
+  { value: "helper", label: "Helper" },
+  { value: "guide", label: "Guide" },
+  { value: "other", label: "Other" },
+] as const;
+export type StaffType = (typeof STAFF_TYPES)[number]["value"];
+export const STAFF_TYPE_VALUES = STAFF_TYPES.map((c) => c.value) as [StaffType, ...StaffType[]];
+export const staffTypeLabel = (v: string) => STAFF_TYPES.find((c) => c.value === v)?.label ?? v;
+
+export const ATTENDANCE_STATUSES = [
+  { value: "present", label: "Present", short: "P", tone: "leaf" },
+  { value: "half_day", label: "Half day", short: "H", tone: "sun" },
+  { value: "leave", label: "Leave", short: "L", tone: "sky" },
+  { value: "absent", label: "Absent", short: "A", tone: "coral" },
+  { value: "holiday", label: "Holiday", short: "HO", tone: "brand" },
+  { value: "week_off", label: "Week off", short: "W", tone: "slate" },
+] as const satisfies readonly { value: string; label: string; short: string; tone: Tone }[];
+export type AttendanceStatus = (typeof ATTENDANCE_STATUSES)[number]["value"];
+export const ATTENDANCE_STATUS_VALUES = ATTENDANCE_STATUSES.map((s) => s.value) as [AttendanceStatus, ...AttendanceStatus[]];
+export const attendanceMeta = (v: string) => ATTENDANCE_STATUSES.find((s) => s.value === v) ?? ATTENDANCE_STATUSES[3];
+
+export const LEAVE_TYPES = [
+  { value: "casual", label: "Casual leave (paid)", paid: true },
+  { value: "sick", label: "Sick leave (paid)", paid: true },
+  { value: "paid", label: "Earned / Paid leave", paid: true },
+  { value: "unpaid", label: "Unpaid leave", paid: false },
+] as const;
+export type LeaveType = (typeof LEAVE_TYPES)[number]["value"];
+export const LEAVE_TYPE_VALUES = LEAVE_TYPES.map((l) => l.value) as [LeaveType, ...LeaveType[]];
+export const leaveTypeLabel = (v: string) => LEAVE_TYPES.find((l) => l.value === v)?.label ?? v;
+
+export const ITINERARY_STATUSES = [
+  { value: "draft", label: "Draft", tone: "slate" },
+  { value: "sent", label: "Sent to customer", tone: "sky" },
+  { value: "confirmed", label: "Confirmed", tone: "leaf" },
+] as const satisfies readonly { value: string; label: string; tone: Tone }[];
+export type ItineraryStatus = (typeof ITINERARY_STATUSES)[number]["value"];
+export const ITINERARY_STATUS_VALUES = ITINERARY_STATUSES.map((s) => s.value) as [ItineraryStatus, ...ItineraryStatus[]];
