@@ -1,4 +1,4 @@
-import { INVOICE_DEFAULTS } from "../invoice-defaults";
+import { DEFAULT_PARTNER_LOGOS, INVOICE_DEFAULTS } from "../invoice-defaults";
 import mongoose, { Schema, model, models, type InferSchemaType, type Model, Types } from "mongoose";
 import {
   ACTIVITY_TYPES,
@@ -213,6 +213,7 @@ const InvoiceSchema = new Schema(
       vehicleType: { type: String, default: "" },
     },
     taxType: { type: String, enum: ["cgst_sgst", "igst"], default: "cgst_sgst" },
+    remarks: { type: String, default: "" },
     issueDate: { type: Date, required: true },
     dueDate: { type: Date, required: true },
     items: { type: [InvoiceItemSchema], default: [] },
@@ -294,6 +295,12 @@ const SettingsSchema = new Schema(
       paymentTerms: { type: String, default: INVOICE_DEFAULTS.paymentTerms },
       refundNote: { type: String, default: INVOICE_DEFAULTS.refundNote },
       footerNote: { type: String, default: INVOICE_DEFAULTS.footerNote },
+      showPartnerLogos: { type: Boolean, default: true },
+      partnerTitle: { type: String, default: "" },
+      partnerLogos: {
+        type: [new Schema({ name: { type: String, default: "" }, src: { type: String, required: true } }, { _id: false })],
+        default: () => DEFAULT_PARTNER_LOGOS.map((l) => ({ ...l })),
+      },
       prefix: { type: String, default: "AAL" },
       defaultTaxRate: { type: Number, default: 5 },
       dueDays: { type: Number, default: 7 },

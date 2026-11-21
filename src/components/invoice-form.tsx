@@ -25,6 +25,7 @@ export type InvoiceInit = {
   state?: string;
   amountPaid?: number;
   taxType?: string;
+  remarks?: string;
   tour?: { name?: string; duration?: string; adults?: number; children?: number; rooms?: number; startDate?: string; endDate?: string; startPoint?: string; endPoint?: string; foodPlan?: string; propertyType?: string; vehicleSeat?: string; vehicleType?: string };
 };
 
@@ -50,6 +51,7 @@ export function InvoiceForm({ init, presetCustomer }: { init?: InvoiceInit; pres
     discount: init?.discount ? String(init.discount) : "",
     taxRate: init?.taxRate !== undefined ? String(init.taxRate) : "",
     notes: init?.notes ?? "Thank you for choosing us! Have a wonderful journey.",
+    remarks: init?.remarks ?? "",
     terms: init?.terms ?? "",
   });
   const [items, setItems] = useState<Item[]>(init?.items?.map((i) => ({ description: i.description, quantity: String(i.quantity), rate: String(i.rate) })) ?? [{ description: "", quantity: "1", rate: "" }]);
@@ -187,6 +189,7 @@ export function InvoiceForm({ init, presetCustomer }: { init?: InvoiceInit; pres
         discount: Number(f.discount) || 0,
         taxRate: Number(f.taxRate) || 0,
         notes: f.notes,
+        remarks: f.remarks.trim(),
         terms: f.terms,
       };
       let id = init?._id;
@@ -347,6 +350,11 @@ export function InvoiceForm({ init, presetCustomer }: { init?: InvoiceInit; pres
           <Button variant="ghost" size="sm" className="mt-3" icon={<Plus className="h-4 w-4" />} onClick={() => setItems((a) => [...a, { description: "", quantity: "1", rate: "" }])}>
             Add line
           </Button>
+        </Card>
+        <Card title="Remarks">
+          <Field label="Remarks (printed on the bill)" hint={`${f.remarks.length}/1000 · e.g. special requests, inclusions agreed on call, pickup details`}>
+            <textarea className="input" rows={3} maxLength={1000} value={f.remarks} onChange={(e) => setF({ ...f, remarks: e.target.value })} placeholder="e.g. Early check-in requested at Srinagar. Honeymoon cake & flower decoration included." />
+          </Field>
         </Card>
         <Card title="Notes & terms">
           <div className="grid gap-3.5">

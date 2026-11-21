@@ -143,6 +143,7 @@ export const InvoiceInput = z
     tripTitle: optStr(200),
     tour: TourInput.optional(),
     taxType: z.enum(["cgst_sgst", "igst"]).optional(),
+    remarks: optStr(1000),
     issueDate: z.coerce.date(),
     dueDate: z.coerce.date(),
     items: z.array(InvoiceItem).min(1, "Add at least one line item"),

@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Bot, Building2, CheckCircle2, CircleDashed, Copy, Database, FileText, KeyRound, Plug, Plus, RefreshCw, Save, Trash2, Sparkles } from "lucide-react";
+import { ArrowDown, ArrowUp, Bot, Building2, CheckCircle2, CircleDashed, Copy, Database, FileText, KeyRound, Plug, Plus, RefreshCw, Save, Trash2, Sparkles } from "lucide-react";
 import { api, useApi } from "@/lib/client";
 import { cn } from "@/lib/format";
 import { Badge, Button, Card, ErrorState, Field, PageHeader, PageLoader, Tabs, useUi } from "@/components/ui";
@@ -9,7 +9,7 @@ import { useMe } from "@/components/session";
 type Pkg = { name: string; destination: string; keywords: string[]; duration: string; pricePerPerson: number; inclusions: string; highlights: string; bestTime: string };
 type S = {
   company: Record<string, string>;
-  invoice: { template: "classic" | "modern"; numberStyle: "plain" | "prefixed"; startNumber: number; taxType: "cgst_sgst" | "igst"; cancellationPolicy: string; childPolicy: string; paymentTerms: string; refundNote: string; footerNote: string; prefix: string; defaultTaxRate: number; dueDays: number; terms: string; bankDetails: string; upiId: string };
+  invoice: { showPartnerLogos: boolean; partnerTitle: string; partnerLogos: { name: string; src: string }[]; template: "classic" | "modern"; numberStyle: "plain" | "prefixed"; startNumber: number; taxType: "cgst_sgst" | "igst"; cancellationPolicy: string; childPolicy: string; paymentTerms: string; refundNote: string; footerNote: string; prefix: string; defaultTaxRate: number; dueDays: number; terms: string; bankDetails: string; upiId: string };
   ai: { enabled: boolean; model: string; assistantName: string; tone: string; about: string; services: string; policies: string; officeHours: string; autoCreateLead: boolean; autoFollowUp: boolean; autoStatus: boolean; packages: Pkg[]; faqs: { question: string; answer: string }[] };
   leads: { autoAssign: "none" | "round_robin"; captureApiKey?: string };
 };
@@ -191,6 +191,78 @@ export default function SettingsPage() {
               <Field label="Terms (Modern format)" className="sm:col-span-3">
                 <textarea className="input" rows={3} value={s.invoice.terms} onChange={(e) => set("invoice", { terms: e.target.value })} />
               </Field>
+            </div>
+          </Card>
+          <Card
+            title="Logos at the bottom of the bill"
+            action={
+              !ro && (
+                <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-line px-3 py-1.5 text-xs font-semibold hover:bg-surface-2">
+                  <Plus className="h-3.5 w-3.5" /> Add logo
+                  <input
+                    type="file"
+                    multiple
+                    accept="image/png,image/jpeg,image/webp"
+                    className="sr-only"
+                    onChange={async (e) => {
+                      const files = Array.from(e.target.files ?? []);
+                      e.target.value = "";
+                      const added: { name: string; src: string }[] = [];
+                      for (const file of files) {
+                        try {
+                          added.push({ name: file.name.replace(/\.[^.]+$/, "").replace(/[-_]+/g, " "), src: await resizeImage(file, 360) });
+                        } catch {
+                          toast(`Could not read ${file.name}`, "error");
+                        }
+                      }
+                      const all = [...(s.invoice.partnerLogos ?? []), ...added];
+                      if (all.length > 12) toast("Up to 12 logos can be shown — extra ones were skipped", "info");
+                      set("invoice", { partnerLogos: all.slice(0, 12) });
+                    }}
+                  />
+                </label>
+              )
+            }
+          >
+            <div className="space-y-3">
+              <Toggle label="Show logos on invoices" desc="Printed in a row above the footer line, on both invoice formats and the customer share link." checked={s.invoice.showPartnerLogos !== false} onChange={(v) => set("invoice", { showPartnerLogos: v })} />
+              <Field label="Heading above the logos (optional)" hint="Leave empty to show the logos without a heading">
+                <input className="input" value={s.invoice.partnerTitle ?? ""} maxLength={80} onChange={(e) => set("invoice", { partnerTitle: e.target.value })} placeholder="e.g. Our tour destinations" />
+              </Field>
+              {(s.invoice.partnerLogos ?? []).length === 0 ? (
+                <p className="rounded-xl border border-dashed border-line p-4 text-center text-sm text-muted">No logos added.</p>
+              ) : (
+                <ul className="divide-y divide-line rounded-xl border border-line">
+                  {s.invoice.partnerLogos.map((l, i, arr) => {
+                    const move = (to: number) => {
+                      const next = [...arr];
+                      [next[i], next[to]] = [next[to], next[i]];
+                      set("invoice", { partnerLogos: next });
+                    };
+                    return (
+                      <li key={i} className="flex items-center gap-3 p-2.5">
+                        <span className="flex h-12 w-20 shrink-0 items-center justify-center rounded-lg bg-white p-1 ring-1 ring-line">
+                          <img src={l.src} alt={l.name} className="max-h-full max-w-full object-contain" />
+                        </span>
+                        <input className="input h-9 min-w-0 flex-1" value={l.name} aria-label="Logo name" onChange={(e) => set("invoice", { partnerLogos: arr.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)) })} />
+                        {!ro && (
+                          <div className="flex shrink-0 items-center">
+                            <button type="button" disabled={i === 0} onClick={() => move(i - 1)} className="rounded-lg p-1.5 text-muted hover:bg-surface-2 disabled:opacity-30" aria-label="Move left">
+                              <ArrowUp className="h-4 w-4" />
+                            </button>
+                            <button type="button" disabled={i === arr.length - 1} onClick={() => move(i + 1)} className="rounded-lg p-1.5 text-muted hover:bg-surface-2 disabled:opacity-30" aria-label="Move right">
+                              <ArrowDown className="h-4 w-4" />
+                            </button>
+                            <button type="button" onClick={() => set("invoice", { partnerLogos: arr.filter((_, j) => j !== i) })} className="rounded-lg p-1.5 text-muted hover:bg-coral-soft hover:text-coral" aria-label={`Remove ${l.name}`}>
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
             </div>
           </Card>
           <Card title="Policies printed on the Aalat Travels invoice">

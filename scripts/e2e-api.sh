@@ -57,6 +57,17 @@ TOK=$(req $B/api/invoices/$IID | jq_ "d['invoice']['shareToken']")
 check "public invoice link" $(curl -s -o /dev/null -w "%{http_code}" $B/api/public/invoices/$TOK) 200
 check "customer delete blocked (has invoices)" $(code -X DELETE $B/api/customers/$CID) 409
 
+echo "Remarks & bill logos"
+RM=$(req -d "{\"customer\":\"$CID\",\"issueDate\":\"$TODAY\",\"dueDate\":\"$NEXT\",\"remarks\":\"Early check-in requested\",\"items\":[{\"description\":\"Pkg\",\"quantity\":1,\"rate\":1000}]}" $B/api/invoices)
+RID=$(echo "$RM" | jq_ "d['invoice']['_id']")
+check "remarks saved on create" "$(echo "$RM" | jq_ "d['invoice']['remarks'].replace(' ','_')")" Early_check-in_requested
+check "remarks updated" $(req -X PATCH -d '{"remarks":"Cake_included"}' $B/api/invoices/$RID | jq_ "d['invoice']['remarks']") Cake_included
+check "remarks too long rejected" $(code -X PATCH -d "{\"remarks\":\"$(python3 -c 'print("x"*1001)')\"}" $B/api/invoices/$RID) 400
+check "default bill logos = 5" $(req $B/api/settings | jq_ "len(d['settings']['invoice']['partnerLogos'])") 5
+check "bad logo src rejected" $(code -X PATCH -d '{"invoice":{"partnerLogos":[{"name":"x","src":"https://evil.example/x.png"}]}}' $B/api/settings) 400
+RT=$(req $B/api/invoices/$RID | jq_ "d['invoice']['shareToken']")
+check "public link has remarks + logos" $(curl -s $B/api/public/invoices/$RT | jq_ "d['invoice']['remarks']+'/'+str(len(d['invoiceSettings']['partnerLogos']))") Cake_included/5
+check "logo images public" $(curl -s -o /dev/null -w "%{http_code}" $B/brand/partners/jk-tourism.png) 200
 echo "Invoice for a lead (auto-convert)"
 LP="93$(shuf -i 10000000-99999999 -n1)"
 L2=$(req -d "{\"name\":\"Invoice Lead\",\"phone\":\"$LP\",\"destination\":\"Goa\"}" $B/api/leads | jq_ "d['lead']['_id']")

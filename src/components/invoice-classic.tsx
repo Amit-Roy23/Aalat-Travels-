@@ -15,7 +15,26 @@ export type ClassicSettings = {
   footerNote?: string;
   bankDetails?: string;
   upiId?: string;
+  showPartnerLogos?: boolean;
+  partnerTitle?: string;
+  partnerLogos?: { name: string; src: string }[];
 };
+
+/** Strip of partner / tourism-board logos printed at the bottom of the bill. */
+export function PartnerLogos({ settings, className = "" }: { settings: ClassicSettings; className?: string }) {
+  const logos = settings.showPartnerLogos === false ? [] : (settings.partnerLogos ?? []);
+  if (!logos.length) return null;
+  return (
+    <div className={`px-3 py-2 sm:px-5 ${className}`}>
+      {settings.partnerTitle && <p className="mb-1.5 text-center text-[9px] font-bold uppercase tracking-[0.18em] text-[#6b6b6b] sm:text-[10px]">{settings.partnerTitle}</p>}
+      <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 sm:justify-between sm:gap-x-4">
+        {logos.map((l, i) => (
+          <img key={l.src.slice(-40) + i} src={l.src} alt={l.name} title={l.name} className="h-10 w-auto max-w-[130px] object-contain sm:h-[60px] sm:max-w-[175px]" />
+        ))}
+      </div>
+    </div>
+  );
+}
 
 // Colours taken from the Aalat logo
 const RED = "#C80E16";
@@ -215,6 +234,20 @@ export function ClassicInvoice({ inv, company, settings, className = "" }: { inv
         </div>
       </div>
 
+      {/* Remarks */}
+      <div className="flex items-start gap-1.5 border-t-[1.5px] px-3 py-1.5 sm:px-5" style={{ borderColor: RED }}>
+        <span className="shrink-0 pt-px font-bold" style={{ color: RED }}>
+          Remarks:
+        </span>
+        {inv.remarks?.trim() ? (
+          <p className="min-w-0 flex-1 whitespace-pre-line break-words border-b-[1.5px] border-dotted pb-px font-semibold" style={{ borderColor: DOT }}>
+            {inv.remarks.trim()}
+          </p>
+        ) : (
+          <span className="mt-[1.1em] min-w-0 flex-1 border-b-[1.5px] border-dotted" style={{ borderColor: DOT }} />
+        )}
+      </div>
+
       {/* Policies */}
       <div className="grid grid-cols-1 border-t-[1.5px] text-[10.5px] min-[480px]:grid-cols-2 min-[480px]:text-[9.5px] sm:text-[11.5px]" style={{ borderColor: RED }}>
         <div className="px-3 py-1.5 min-[480px]:border-r-[1.5px] sm:px-5" style={{ borderColor: RED }}>
@@ -281,6 +314,7 @@ export function ClassicInvoice({ inv, company, settings, className = "" }: { inv
           </p>
         </div>
       </div>
+      <PartnerLogos settings={settings} className="border-t border-dashed border-[#E7B92E]" />
       <div className="py-1.5 text-center text-[10.5px] font-bold text-white sm:text-[13px]" style={{ background: RED, borderTop: `3px solid ${YEL}` }}>
         {settings.footerNote ?? INVOICE_DEFAULTS.footerNote}
       </div>

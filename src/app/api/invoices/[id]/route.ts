@@ -25,6 +25,7 @@ const Patch = z.object({
   tripTitle: z.string().max(200).optional(),
   tour: TourInput.optional(),
   taxType: z.enum(["cgst_sgst", "igst"]).optional(),
+  remarks: z.string().max(1000).optional(),
   issueDate: z.coerce.date().optional(),
   dueDate: z.coerce.date().optional(),
   items: z.array(InvoiceItem).min(1).optional(),
@@ -50,7 +51,7 @@ export const PATCH = route<P>(async (req, { params }) => {
     if (t.total + 0.005 < inv.amountPaid) throw new HttpError(400, `New total (${money(t.total)}) is less than the amount already paid (${money(inv.amountPaid)}).`);
     inv.set({ items: t.items, subtotal: t.subtotal, discount: t.discount, taxAmount: t.taxAmount, total: t.total, taxRate: data.taxRate ?? inv.taxRate });
   }
-  for (const f of ["tripTitle", "issueDate", "dueDate", "notes", "terms", "taxType"] as const) if (data[f] !== undefined) inv.set(f, data[f]);
+  for (const f of ["tripTitle", "issueDate", "dueDate", "notes", "terms", "taxType", "remarks"] as const) if (data[f] !== undefined) inv.set(f, data[f]);
   if (data.tour) inv.set("tour", cleanTour(data.tour));
   if (+new Date(inv.dueDate) < new Date(inv.issueDate).setHours(0, 0, 0, 0)) throw new HttpError(400, "Due date cannot be before the issue date.");
 

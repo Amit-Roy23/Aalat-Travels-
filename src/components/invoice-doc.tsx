@@ -1,5 +1,6 @@
 import { cn, displayPhone, fmtDate, money } from "@/lib/format";
 import { invoiceStatusMeta, paymentMethodLabel } from "@/lib/constants";
+import { PartnerLogos, type ClassicSettings } from "./invoice-classic";
 
 export type InvoiceDocData = {
   number: string;
@@ -20,13 +21,14 @@ export type InvoiceDocData = {
   customer: { name: string; phone?: string; altPhone?: string; email?: string; address?: string; city?: string; gstin?: string };
   payments?: { amount: number; date: string; method: string }[];
   taxType?: string;
+  remarks?: string;
   tour?: { name?: string; duration?: string; adults?: number; children?: number; rooms?: number; startDate?: string; endDate?: string; startPoint?: string; endPoint?: string; foodPlan?: string; propertyType?: string; vehicleSeat?: string; vehicleType?: string };
 };
 export type CompanyData = { name?: string; tagline?: string; phone?: string; email?: string; website?: string; address?: string; gstin?: string; regNo?: string; logo?: string };
 
 const stampTone: Record<string, string> = { paid: "border-leaf text-leaf", overdue: "border-coral text-coral", partial: "border-sun text-sun", sent: "border-sky text-sky", draft: "border-slate2 text-slate2", cancelled: "border-slate2 text-slate2" };
 
-export function InvoiceDocument({ inv, company, bank, className }: { inv: InvoiceDocData; company: CompanyData; bank?: { bankDetails?: string; upiId?: string }; className?: string }) {
+export function InvoiceDocument({ inv, company, bank, className }: { inv: InvoiceDocData; company: CompanyData; bank?: ClassicSettings; className?: string }) {
   return (
     <article className={cn("print-area overflow-hidden rounded-3xl border border-line bg-white text-[#13202E] shadow-card", className)}>
       <div className="relative bg-sidebar px-6 py-6 text-white sm:px-10 sm:py-8">
@@ -216,6 +218,12 @@ export function InvoiceDocument({ inv, company, bank, className }: { inv: Invoic
             {bank.bankDetails && <p className="whitespace-pre-line">{bank.bankDetails}</p>}
           </div>
         )}
+        {inv.remarks?.trim() && (
+          <div className="mt-6 rounded-xl border border-[#e6e1d7] p-4 text-sm">
+            <p className="mb-1 text-[10.5px] font-bold uppercase tracking-wider text-[#6b7078]">Remarks</p>
+            <p className="whitespace-pre-line">{inv.remarks.trim()}</p>
+          </div>
+        )}
         {inv.notes && <p className="mt-6 text-sm italic text-[#52575f]">{inv.notes}</p>}
         {inv.terms && (
           <div className="mt-5 border-t border-[#e6e1d7] pt-4">
@@ -224,6 +232,7 @@ export function InvoiceDocument({ inv, company, bank, className }: { inv: Invoic
           </div>
         )}
       </div>
+      {bank && <PartnerLogos settings={bank} className="border-t border-[#e6e1d7] py-4 sm:px-10" />}
     </article>
   );
 }

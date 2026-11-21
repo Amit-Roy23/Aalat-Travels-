@@ -23,6 +23,15 @@ export const INVOICE_DEFAULTS = {
   footerNote: "Your journey begins here. Thank you for choosing us to guide the way.",
 };
 
+/** Logos printed in a strip at the bottom of the bill (editable in Settings → Invoices). */
+export const DEFAULT_PARTNER_LOGOS = [
+  { name: "J&K Tourism", src: "/brand/partners/jk-tourism.png" },
+  { name: "Rajasthan Tourism", src: "/brand/partners/rajasthan-tourism.png" },
+  { name: "Assam Tourism", src: "/brand/partners/assam-tourism.png" },
+  { name: "West Bengal Tourism", src: "/brand/partners/bengal-tourism.png" },
+  { name: "Gujarat Tourism", src: "/brand/partners/gujarat-tourism.png" },
+];
+
 export const FOOD_PLANS = ["EP (Room only)", "CP (Breakfast)", "MAP (Breakfast + Dinner)", "AP (All meals)"];
 export const PROPERTY_TYPES = ["Hotel", "Resort", "Homestay", "Houseboat", "Cottage", "Camp / Tent", "Villa", "Hotel + Houseboat"];
 export const VEHICLE_TYPES = ["Sedan (Dzire / Etios)", "SUV (Innova / Ertiga)", "Innova Crysta", "Tempo Traveller", "Mini Bus", "Bus", "Not included"];
