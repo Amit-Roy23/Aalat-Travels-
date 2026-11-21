@@ -245,6 +245,14 @@ body {
     position: static !important;
     width: 100% !important;
   }
+  .itinerary-print,
+  .itinerary-print * {
+    visibility: visible;
+  }
+  .itinerary-print .itinerary-doc {
+    max-width: none !important;
+    box-shadow: none !important;
+  }
   .classic-invoice {
     max-width: none !important;
     font-size: 12px !important;

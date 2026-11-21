@@ -150,6 +150,7 @@ export const InvoiceInput = z
     taxType: z.enum(["cgst_sgst", "igst"]).optional(),
     remarks: optStr(1000),
     installments: InstallmentsInput.optional(),
+    itinerary: z.string().optional().nullable(),
     issueDate: z.coerce.date(),
     dueDate: z.coerce.date(),
     items: z.array(InvoiceItem).min(1, "Add at least one line item"),
@@ -169,4 +170,34 @@ export const PaymentInput = z.object({
   method: z.enum(PAYMENT_METHOD_VALUES).default("upi"),
   reference: optStr(120),
   note: optStr(300),
+});
+
+/* ───────── Itinerary ───────── */
+const ItineraryDay = z.object({
+  title: str(200),
+  description: str(4000).optional().default(""),
+  stay: str(200).optional().default(""),
+  meals: z.object({ breakfast: z.boolean().default(false), lunch: z.boolean().default(false), dinner: z.boolean().default(false) }).default({ breakfast: false, lunch: false, dinner: false }),
+  activities: str(1000).optional().default(""),
+  transport: str(200).optional().default(""),
+});
+export const ItineraryInput = z.object({
+  title: str(160).min(2, "Give the itinerary a title"),
+  customer: z.string().optional().nullable(),
+  lead: z.string().optional().nullable(),
+  guestName: optStr(120),
+  destination: optStr(120),
+  startDate: z.union([z.literal(""), z.null(), z.coerce.date()]).optional(),
+  adults: z.coerce.number().int().min(0).max(1000).default(0),
+  children: z.coerce.number().int().min(0).max(1000).default(0),
+  startPoint: optStr(120),
+  endPoint: optStr(120),
+  days: z.array(ItineraryDay).max(60, "Up to 60 days").default([]),
+  inclusions: optStr(4000),
+  exclusions: optStr(4000),
+  pricePerAdult: z.coerce.number().min(0).max(1e8).default(0),
+  pricePerChild: z.coerce.number().min(0).max(1e8).default(0),
+  priceNote: optStr(300),
+  notes: optStr(4000),
+  status: z.enum(["draft", "sent", "confirmed"]).default("draft"),
 });

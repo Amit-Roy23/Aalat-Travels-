@@ -87,6 +87,18 @@ check "bad UPI id rejected" $(code -X PATCH -d '{"invoice":{"upiId":"not a upi"}
 check "UPI id + QR saved" $(req -X PATCH -d '{"invoice":{"upiId":"aalattravels@sbi","paymentQr":"data:image/png;base64,iVBORw0KGgo=","showPaymentQr":true}}' $B/api/settings | jq_ "d['settings']['invoice']['upiId']+'/'+str(d['settings']['invoice']['paymentQr'][:10])") aalattravels@sbi/data:image
 check "QR reaches the public link" $(curl -s $B/api/public/invoices/$(req $B/api/invoices/$PID | jq_ "d['invoice']['shareToken']") | jq_ "d['invoiceSettings']['paymentQr'][:10]") data:image
 req -X PATCH -d '{"invoice":{"paymentQr":""}}' $B/api/settings >/dev/null
+echo "Itineraries"
+check "itinerary needs a title" $(code -d '{"title":"x"}' $B/api/itineraries) 400
+IT=$(req -d "{\"title\":\"Sikkim Family Tour\",\"customer\":\"$CID\",\"destination\":\"Sikkim\",\"startDate\":\"$NEXT\",\"adults\":2,\"children\":1,\"pricePerAdult\":20000,\"pricePerChild\":14000,\"days\":[{\"title\":\"Arrival\",\"meals\":{\"breakfast\":false,\"lunch\":false,\"dinner\":true}},{\"title\":\"Tsomgo Lake\",\"stay\":\"Gangtok\",\"meals\":{\"breakfast\":true,\"lunch\":false,\"dinner\":true}},{\"title\":\"Departure\"}]}" $B/api/itineraries)
+ITID=$(echo "$IT" | jq_ "d['itinerary']['_id']")
+check "itinerary created with guest name" "$(echo "$IT" | jq_ "d['itinerary']['guestName']!='' and len(d['itinerary']['days'])==3")" True
+check "itinerary updated (days reordered)" $(req -X PATCH -d '{"days":[{"title":"Arrival"},{"title":"Departure"}],"status":"sent"}' $B/api/itineraries/$ITID | jq_ "str(len(d['itinerary']['days']))+'/'+d['itinerary']['status']") 2/sent
+check "itinerary duplicated" $(req -X POST $B/api/itineraries/$ITID/duplicate | jq_ "d['itinerary']['status']+'/'+str(d['itinerary']['title'].endswith('(copy)'))") draft/True
+ITOK=$(req $B/api/itineraries/$ITID | jq_ "d['itinerary']['shareToken']")
+check "public itinerary link (no login, notes hidden)" $(curl -s $B/api/public/itineraries/$ITOK | jq_ "d['itinerary']['title'].replace(' ','_')+'/'+str('notes' in d['itinerary'])") Sikkim_Family_Tour/False
+check "itinerary page public" $(curl -s -o /dev/null -w "%{http_code}" $B/it/$ITOK) 200
+IVI=$(req -d "{\"customer\":\"$CID\",\"itinerary\":\"$ITID\",\"issueDate\":\"$TODAY\",\"dueDate\":\"$NEXT\",\"items\":[{\"description\":\"Sikkim — per adult\",\"quantity\":2,\"rate\":20000}]}" $B/api/invoices | jq_ "d['invoice']['_id']")
+check "invoice links back to itinerary (confirmed)" $(req $B/api/itineraries/$ITID | jq_ "d['itinerary']['status']+'/'+str(d['itinerary']['invoice']['_id']=='$IVI')") confirmed/True
 echo "Invoice for a lead (auto-convert)"
 LP="93$(shuf -i 10000000-99999999 -n1)"
 L2=$(req -d "{\"name\":\"Invoice Lead\",\"phone\":\"$LP\",\"destination\":\"Goa\"}" $B/api/leads | jq_ "d['lead']['_id']")

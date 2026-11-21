@@ -37,13 +37,61 @@ type CustLeads = { leads: { _id: string; destination: string; travelDate: string
 
 type SettingsRes = { settings: { invoice: { defaultTaxRate: number; dueDays: number; terms: string; taxType: string }; ai: { packages: { name: string; duration: string; pricePerPerson: number }[] } } };
 
-export function InvoiceForm({ init, presetCustomer }: { init?: InvoiceInit; presetCustomer?: { id: string; name: string; phone?: string } | null }) {
+export type ItinerarySource = {
+  _id: string;
+  title: string;
+  destination?: string;
+  startDate?: string;
+  adults: number;
+  children: number;
+  startPoint?: string;
+  endPoint?: string;
+  days: { stay?: string; meals?: { breakfast?: boolean; lunch?: boolean; dinner?: boolean } }[];
+  pricePerAdult: number;
+  pricePerChild: number;
+  customer?: { _id: string; name: string; phone?: string } | null;
+  lead?: { _id: string; name: string; phone?: string } | null;
+};
+
+/** Pre-fills a new invoice from an itinerary: guest, tour details and per-adult / per-child lines. */
+function fromItineraryInit(it: ItinerarySource): InvoiceInit {
+  const n = it.days.length;
+  const meals = it.days.slice(0, -1);
+  const allB = meals.length > 0 && meals.every((d) => d.meals?.breakfast);
+  const allD = meals.length > 0 && meals.every((d) => d.meals?.dinner);
+  const allL = meals.length > 0 && meals.every((d) => d.meals?.lunch);
+  const plan = allB && allL && allD ? "AP (All meals)" : allB && allD ? "MAP (Breakfast + Dinner)" : allB ? "CP (Breakfast)" : "";
+  const start = it.startDate ? new Date(it.startDate) : null;
+  return {
+    tripTitle: it.title,
+    tour: {
+      name: it.title,
+      duration: n > 1 ? `${n - 1} Nights / ${n} Days` : n === 1 ? "1 Day" : "",
+      adults: it.adults,
+      children: it.children,
+      rooms: it.adults ? Math.max(1, Math.ceil(it.adults / 2)) : 0,
+      startDate: it.startDate,
+      endDate: start && n > 0 ? new Date(start.getTime() + (n - 1) * 86400000).toISOString() : undefined,
+      startPoint: it.startPoint,
+      endPoint: it.endPoint,
+      foodPlan: plan,
+    },
+    items: [
+      ...(it.adults && it.pricePerAdult ? [{ description: `${it.title} — per adult`, quantity: it.adults, rate: it.pricePerAdult }] : []),
+      ...(it.children && it.pricePerChild ? [{ description: `${it.title} — per child`, quantity: it.children, rate: it.pricePerChild }] : []),
+    ],
+  };
+}
+
+export function InvoiceForm({ init: initProp, presetCustomer, fromItinerary }: { init?: InvoiceInit; presetCustomer?: { id: string; name: string; phone?: string } | null; fromItinerary?: ItinerarySource }) {
+  const init: InvoiceInit | undefined = initProp ?? (fromItinerary ? fromItineraryInit(fromItinerary) : undefined);
+  const itGuest = fromItinerary?.customer ? { kind: "customer" as const, id: fromItinerary.customer._id, name: fromItinerary.customer.name, phone: fromItinerary.customer.phone } : fromItinerary?.lead ? { kind: "lead" as const, id: fromItinerary.lead._id, name: fromItinerary.lead.name, phone: fromItinerary.lead.phone } : null;
   const router = useRouter();
   const { toast } = useUi();
   const { data: st } = useApi<SettingsRes>("/api/settings", { revalidateOnFocus: false });
-  const editing = Boolean(init?._id);
+  const editing = Boolean(initProp?._id);
   const [customer, setCustomer] = useState<{ kind: "lead" | "customer"; id: string; name: string; phone?: string } | null>(
-    init?.customer ? { kind: "customer", id: init.customer._id, name: init.customer.name, phone: init.customer.phone } : presetCustomer ? { kind: "customer", ...presetCustomer } : null,
+    init?.customer ? { kind: "customer", id: init.customer._id, name: init.customer.name, phone: init.customer.phone } : presetCustomer ? { kind: "customer", ...presetCustomer } : itGuest,
   );
   const today = toDateInput(new Date());
   const [f, setF] = useState({
@@ -210,7 +258,7 @@ export function InvoiceForm({ init, presetCustomer }: { init?: InvoiceInit; pres
         await api(`/api/invoices/${id}`, { method: "PATCH", body: { ...body, ...(init?.state === "draft" && state === "issued" ? { state: "issued" } : {}) } });
       } else {
         const r = await api<{ invoice: { _id: string } }>("/api/invoices", {
-          body: { ...body, customer: customer.kind === "customer" ? customer.id : undefined, lead: customer.kind === "lead" ? customer.id : leadId || undefined, state },
+          body: { ...body, customer: customer.kind === "customer" ? customer.id : undefined, lead: customer.kind === "lead" ? customer.id : leadId || undefined, itinerary: fromItinerary?._id, state },
         });
         id = r.invoice._id;
       }
