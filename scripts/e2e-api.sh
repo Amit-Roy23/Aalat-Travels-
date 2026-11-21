@@ -57,6 +57,15 @@ TOK=$(req $B/api/invoices/$IID | jq_ "d['invoice']['shareToken']")
 check "public invoice link" $(curl -s -o /dev/null -w "%{http_code}" $B/api/public/invoices/$TOK) 200
 check "customer delete blocked (has invoices)" $(code -X DELETE $B/api/customers/$CID) 409
 
+echo "Invoice for a lead (auto-convert)"
+LP="93$(shuf -i 10000000-99999999 -n1)"
+L2=$(req -d "{\"name\":\"Invoice Lead\",\"phone\":\"$LP\",\"destination\":\"Goa\"}" $B/api/leads | jq_ "d['lead']['_id']")
+check "no customer and no lead rejected" $(code -d "{\"issueDate\":\"$TODAY\",\"dueDate\":\"$NEXT\",\"items\":[{\"description\":\"Pkg\",\"quantity\":1,\"rate\":100}]}" $B/api/invoices) 400
+check "invalid invoice does not convert the lead" $(code -d "{\"lead\":\"$L2\",\"issueDate\":\"$TODAY\",\"dueDate\":\"$NEXT\",\"items\":[{\"description\":\"Pkg\",\"quantity\":1,\"rate\":0}]}" $B/api/invoices)/$(req $B/api/leads/$L2 | jq_ "d['lead']['status']") 400/new
+IL=$(req -d "{\"lead\":\"$L2\",\"issueDate\":\"$TODAY\",\"dueDate\":\"$NEXT\",\"items\":[{\"description\":\"Goa pkg\",\"quantity\":1,\"rate\":100000}]}" $B/api/invoices)
+check "invoice billed to a lead created" $(echo "$IL" | jq_ "d['invoice']['total']") 105000
+LC=$(req $B/api/leads/$L2 | jq_ "d['lead']['status']+'/'+str(d['lead']['customer'])")
+check "lead converted + invoice billed to its customer" $LC "converted/$(echo "$IL" | jq_ "d['invoice']['customer']")"
 echo "Lead capture webhook"
 KEY=$(req $B/api/settings | jq_ "d['settings']['leads']['captureApiKey']")
 WP="97$(shuf -i 10000000-99999999 -n1)"
@@ -102,4 +111,5 @@ check "agent blocked from others' lead" $(code $B/api/leads/$OTHER) 403
 check "agent blocked from reports" $(code $B/api/reports) 403
 check "agent cannot change settings" $(code -X PATCH -d '{"company":{"name":"X"}}' $B/api/settings) 403
 check "agent cannot delete lead" $(code -X DELETE $B/api/leads/$OTHER) 403
+check "agent cannot bill another agent's lead" $(code -d "{\"lead\":\"$OTHER\",\"issueDate\":\"$TODAY\",\"dueDate\":\"$NEXT\",\"items\":[{\"description\":\"Pkg\",\"quantity\":1,\"rate\":100}]}" $B/api/invoices) 403
 echo; echo "PASSED $pass  FAILED $fail"

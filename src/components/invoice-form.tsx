@@ -1,11 +1,11 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Trash2, Save, Send } from "lucide-react";
+import { AlertTriangle, Plus, Trash2, Save, Send, UserPlus } from "lucide-react";
 import { api, useApi } from "@/lib/client";
 import { money, round2, toDateInput } from "@/lib/format";
 import { Button, Card, Field, useUi } from "./ui";
-import { EntityPicker } from "./forms";
+import { CustomerFormModal, EntityPicker } from "./forms";
 import { FOOD_PLANS, PROPERTY_TYPES, VEHICLE_TYPES } from "@/lib/invoice-defaults";
 
 type Item = { description: string; quantity: string; rate: string };
@@ -75,15 +75,40 @@ export function InvoiceForm({ init, presetCustomer }: { init?: InvoiceInit; pres
   );
   const [taxType, setTaxType] = useState(init?.taxType ?? "");
   const [leadId, setLeadId] = useState<string>(typeof init?.lead === "string" ? init.lead : (init?.lead?._id ?? ""));
-  const { data: custData } = useApi<CustLeads>(!editing && customer ? `/api/customers/${customer.id}` : null);
+  const { data: custData } = useApi<CustLeads>(!editing && customer?.kind === "customer" ? `/api/customers/${customer.id}` : null);
+  const [newCust, setNewCust] = useState<string | null>(null);
   const setT = (k: keyof Tour) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setTour((p) => ({ ...p, [k]: e.target.value }));
   const [err, setErr] = useState("");
+  const [errField, setErrField] = useState<"" | "customer" | "items" | "dates" | "tour">("");
   const [busy, setBusy] = useState<"" | "draft" | "issued">("");
+
+  /** Shows a validation/server error where the user can see it: next to the button, as a toast, and scrolls to the field. */
+  const fail = (msg: string, field: typeof errField = "") => {
+    setErr(msg);
+    setErrField(field);
+    toast(msg, "error");
+    const target = { customer: "inv-billto", items: "inv-items", dates: "inv-billto", tour: "inv-tour", "": "" }[field];
+    if (target) document.getElementById(target)?.scrollIntoView({ behavior: "smooth", block: "center" });
+  };
+
+  const pickCustomer = (v: typeof customer) => {
+    setCustomer(v);
+    if (errField === "customer") (setErr(""), setErrField(""));
+    if (v?.kind === "lead") {
+      setLeadId(v.id);
+      api<{ lead: CustLeads["leads"][number] }>(`/api/leads/${v.id}`)
+        .then((r) => applyLead(r.lead))
+        .catch(() => undefined);
+    } else if (!v) setLeadId("");
+  };
 
   const fillFromLead = (id: string) => {
     setLeadId(id);
     const l = custData?.leads.find((x) => x._id === id);
-    if (!l) return;
+    if (l) applyLead(l);
+  };
+
+  const applyLead = (l: CustLeads["leads"][number]) => {
     const pkg = st?.settings.ai.packages.find((p) => p.name && l.destination && p.name.toLowerCase().includes(l.destination.toLowerCase()));
     setTour((p) => ({
       ...p,
@@ -130,16 +155,19 @@ export function InvoiceForm({ init, presetCustomer }: { init?: InvoiceInit; pres
   };
 
   const save = async (state: "draft" | "issued") => {
+    if (busy) return;
     setErr("");
-    if (!customer) return setErr("Choose a customer.");
+    setErrField("");
+    if (!customer) return fail("Choose who this invoice is for — search a customer or lead under “Bill to”, or add a new customer.", "customer");
     const clean = items.filter((i) => i.description.trim() || Number(i.rate));
-    if (!clean.length) return setErr("Add at least one line item.");
-    if (clean.some((i) => !i.description.trim())) return setErr("Every line item needs a description.");
-    if (clean.some((i) => !(Number(i.quantity) > 0))) return setErr("Quantities must be greater than 0.");
-    if (totals.total <= 0) return setErr("Invoice total must be greater than zero.");
-    if (f.dueDate < f.issueDate) return setErr("Due date cannot be before the issue date.");
-    if (tour.startDate && tour.endDate && tour.endDate < tour.startDate) return setErr("Tour ending date cannot be before the starting date.");
-    if (editing && init?.amountPaid && totals.total < init.amountPaid) return setErr(`Total cannot be less than the ${money(init.amountPaid)} already paid.`);
+    if (!clean.length) return fail("Add at least one line item with a description and rate.", "items");
+    if (clean.some((i) => !i.description.trim())) return fail("Every line item needs a description.", "items");
+    if (clean.some((i) => !(Number(i.quantity) > 0))) return fail("Quantities must be greater than 0.", "items");
+    if (totals.total <= 0) return fail("Invoice total must be greater than zero.", "items");
+    if (!f.issueDate || !f.dueDate) return fail("Choose the issue date and due date.", "dates");
+    if (f.dueDate < f.issueDate) return fail("Due date cannot be before the issue date.", "dates");
+    if (tour.startDate && tour.endDate && tour.endDate < tour.startDate) return fail("Tour ending date cannot be before the starting date.", "tour");
+    if (editing && init?.amountPaid && totals.total < init.amountPaid) return fail(`Total cannot be less than the ${money(init.amountPaid)} already paid.`, "items");
     setBusy(state);
     try {
       const body = {
@@ -165,13 +193,16 @@ export function InvoiceForm({ init, presetCustomer }: { init?: InvoiceInit; pres
       if (editing) {
         await api(`/api/invoices/${id}`, { method: "PATCH", body: { ...body, ...(init?.state === "draft" && state === "issued" ? { state: "issued" } : {}) } });
       } else {
-        const r = await api<{ invoice: { _id: string } }>("/api/invoices", { body: { ...body, customer: customer.id, lead: leadId || undefined, state } });
+        const r = await api<{ invoice: { _id: string } }>("/api/invoices", {
+          body: { ...body, customer: customer.kind === "customer" ? customer.id : undefined, lead: customer.kind === "lead" ? customer.id : leadId || undefined, state },
+        });
         id = r.invoice._id;
       }
       toast(editing ? "Invoice updated" : state === "draft" ? "Draft saved" : "Invoice created");
       router.push(`/invoices/${id}`);
     } catch (e) {
-      setErr((e as Error).message);
+      const msg = (e as Error).message;
+      fail(msg, /customer|lead/i.test(msg) ? "customer" : /date/i.test(msg) ? "dates" : /item|total|amount/i.test(msg) ? "items" : "");
       setBusy("");
     }
   };
@@ -179,11 +210,28 @@ export function InvoiceForm({ init, presetCustomer }: { init?: InvoiceInit; pres
   return (
     <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
       <div className="space-y-4">
-        {err && <div className="rounded-xl bg-coral-soft px-4 py-3 text-sm font-medium text-coral">{err}</div>}
-        <Card title="Bill to">
+        <span id="inv-billto" className="block scroll-mt-24" />
+        <Card title="Bill to" className={errField === "customer" || errField === "dates" ? "ring-2 ring-coral/40" : ""}>
           <div className="grid gap-3.5 sm:grid-cols-2">
-            <Field label="Customer" required className="sm:col-span-2">
-              {editing ? <div className="rounded-xl border border-line bg-surface-2 px-3 py-2 text-sm font-semibold">{customer?.name}</div> : <EntityPicker value={customer} onChange={setCustomer} kinds={["customer"]} />}
+            <Field label="Customer" required className="sm:col-span-2" error={errField === "customer" ? "Choose who this invoice is for" : undefined}>
+              {editing ? (
+                <div className="rounded-xl border border-line bg-surface-2 px-3 py-2 text-sm font-semibold">{customer?.name}</div>
+              ) : (
+                <>
+                  <EntityPicker
+                    value={customer}
+                    onChange={pickCustomer}
+                    kinds={["customer", "lead"]}
+                    invalid={errField === "customer"}
+                    footer={(q) => (
+                      <button type="button" onClick={() => setNewCust(q)} className="mt-2 inline-flex items-center gap-1.5 text-sm font-semibold text-brand hover:underline">
+                        <UserPlus className="h-4 w-4" /> Add a new customer{q ? ` “${q}”` : ""}
+                      </button>
+                    )}
+                  />
+                  {customer?.kind === "lead" && <p className="mt-1.5 text-xs text-muted">This lead will be converted to a customer when the invoice is saved.</p>}
+                </>
+              )}
             </Field>
             <Field label="Trip / reference" className="sm:col-span-2">
               <input className="input" value={f.tripTitle} onChange={(e) => setF({ ...f, tripTitle: e.target.value })} placeholder="e.g. Goa family trip · 22–26 Dec" />
@@ -196,6 +244,7 @@ export function InvoiceForm({ init, presetCustomer }: { init?: InvoiceInit; pres
             </Field>
           </div>
         </Card>
+        <span id="inv-tour" className="block scroll-mt-24" />
         <Card
           title="Tour details"
           action={
@@ -258,8 +307,10 @@ export function InvoiceForm({ init, presetCustomer }: { init?: InvoiceInit; pres
           <datalist id="property-types">{PROPERTY_TYPES.map((x) => <option key={x} value={x} />)}</datalist>
           <datalist id="vehicle-types">{VEHICLE_TYPES.map((x) => <option key={x} value={x} />)}</datalist>
         </Card>
+        <span id="inv-items" className="block scroll-mt-24" />
         <Card
           title="Line items"
+          className={errField === "items" ? "ring-2 ring-coral/40" : ""}
           action={
             !!st?.settings.ai.packages.length && (
               <select className="input h-8 w-40 text-xs sm:w-auto sm:max-w-[260px]" value="" onChange={(e) => addPackage(e.target.value)} aria-label="Add package">
@@ -354,6 +405,12 @@ export function InvoiceForm({ init, presetCustomer }: { init?: InvoiceInit; pres
             </div>
             {editing && !!init?.amountPaid && <p className="text-xs text-muted">Already paid: {money(init.amountPaid)}</p>}
           </div>
+          {err && (
+            <div role="alert" className="mt-4 flex items-start gap-2 rounded-xl bg-coral-soft px-3 py-2.5 text-[13px] font-medium text-coral">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>{err}</span>
+            </div>
+          )}
           <div className="mt-5 grid gap-2">
             {(!editing || init?.state === "draft") && (
               <Button onClick={() => save("issued")} loading={busy === "issued"} disabled={!!busy} icon={<Send className="h-4 w-4" />}>
@@ -366,6 +423,12 @@ export function InvoiceForm({ init, presetCustomer }: { init?: InvoiceInit; pres
           </div>
         </Card>
       </div>
+      <CustomerFormModal
+        open={newCust !== null}
+        initialName={newCust ?? ""}
+        onClose={() => setNewCust(null)}
+        onSaved={(id, name, phone) => pickCustomer({ kind: "customer", id, name, phone })}
+      />
     </div>
   );
 }
