@@ -176,6 +176,60 @@ check "paid payroll locked" $(code -X PATCH -d '{"bonus":1}' $B/api/payroll/$PR)
 check "advance with recovery can't be deleted" $(code -X DELETE $B/api/staff/advances/$(req $B/api/staff/$SID/advances | jq_ "d['items'][0]['_id']")) 409
 check "reopen → advance restored" $(req -X POST $B/api/payroll/$PR/reopen >/dev/null; req $B/api/staff/$SID/advances | jq_ "d['items'][0]['recovered']") 0
 check "future payroll month rejected" $(code -d '{"month":"2099-01"}' $B/api/payroll) 400
+echo "Operations (tour cost sheet, vendors, inventory)"
+VH=$(req -d '{"name":"E2E Lake Resort","type":"hotel","phone":"9876500011"}' $B/api/vendors | jq_ "d['vendor']['_id']")
+VG=$(req -d '{"name":"E2E Grocers","type":"grocery"}' $B/api/vendors | jq_ "d['vendor']['_id']")
+check "vendor created" $([ -n "$VH" ] && echo ok) ok
+check "tour end before start rejected" $(code -d "{\"name\":\"Bad dates\",\"startDate\":\"$NEXT\",\"endDate\":\"$TODAY\"}" $B/api/tours) 400
+TID=$(req -d "{\"name\":\"E2E Kashmir Group\",\"destination\":\"Srinagar\",\"startDate\":\"$TODAY\",\"endDate\":\"$NEXT\",\"pax\":12}" $B/api/tours | jq_ "d['tour']['_id']")
+check "tour created" $([ -n "$TID" ] && echo ok) ok
+check "advance above amount rejected" $(code -d "{\"section\":\"hotels\",\"hotelName\":\"X\",\"amount\":1000,\"advance\":2000}" $B/api/tours/$TID/lines) 400
+check "check-out before check-in rejected" $(code -d "{\"section\":\"hotels\",\"hotelName\":\"X\",\"checkIn\":\"$NEXT\",\"checkOut\":\"$TODAY\",\"amount\":1000}" $B/api/tours/$TID/lines) 400
+R=$(req -d "{\"section\":\"hotels\",\"vendor\":\"$VH\",\"hotelName\":\"Lake Resort\",\"checkIn\":\"$TODAY\",\"checkOut\":\"$NEXT\",\"rooms\":6,\"amount\":60000,\"advance\":20000}" $B/api/tours/$TID/lines)
+check "hotel line: advance & due" $(echo "$R" | jq_ "'%d/%d' % (d['tour']['hotels'][0]['paid'], d['tour']['hotels'][0]['due'])") 20000/40000
+HL=$(echo "$R" | jq_ "d['tour']['hotels'][0]['_id']")
+R=$(req -d "{\"section\":\"cars\",\"vehicleType\":\"Tempo Traveller\",\"carNumber\":\"JK01AB1234\",\"driverName\":\"Bashir\",\"driverPhone\":\"9906000000\",\"amount\":25000,\"advance\":5000}" $B/api/tours/$TID/lines)
+check "car line keeps car & driver number" $(echo "$R" | jq_ "d['tour']['cars'][0]['carNumber']+'/'+d['tour']['cars'][0]['driverPhone']") JK01AB1234/9906000000
+SID2=$(req -d '{"name":"E2E Tour Manager","type":"tour_manager","salaryType":"daily","salary":1500}' $B/api/staff | jq_ "d['staff']['_id']")
+R=$(req -d "{\"section\":\"staff\",\"staff\":\"$SID2\",\"days\":7,\"amount\":10500,\"advance\":3000}" $B/api/tours/$TID/lines)
+check "staff line takes name from staff" $(echo "$R" | jq_ "d['tour']['staff'][0]['name']=='E2E Tour Manager'") True
+check "staff line needs name or staff" $(code -d '{"section":"staff","amount":100}' $B/api/tours/$TID/lines) 400
+req -d "{\"section\":\"expenses\",\"category\":\"train\",\"description\":\"12 x 3AC\",\"amount\":18000,\"advance\":18000}" $B/api/tours/$TID/lines >/dev/null
+R=$(req -d "{\"section\":\"expenses\",\"category\":\"meat_fish\",\"description\":\"Chicken 10kg\",\"amount\":2600}" $B/api/tours/$TID/lines)
+check "total investment" $(echo "$R" | jq_ "int(d['summary']['cost'])") 116100
+check "total paid" $(echo "$R" | jq_ "int(d['summary']['paid'])") 46000
+check "total due" $(echo "$R" | jq_ "int(d['summary']['due'])") 70100
+check "category breakdown (train)" $(echo "$R" | jq_ "int(d['summary']['categories']['train']['amount'])") 18000
+check "overpay on line rejected" $(code -d "{\"section\":\"hotels\",\"amount\":50000,\"date\":\"$TODAY\"}" $B/api/tours/$TID/lines/$HL/payments) 400
+R=$(req -d "{\"section\":\"hotels\",\"amount\":40000,\"date\":\"$TODAY\",\"method\":\"bank_transfer\"}" $B/api/tours/$TID/lines/$HL/payments)
+check "hotel settled" $(echo "$R" | jq_ "int(d['tour']['hotels'][0]['due'])") 0
+check "amount below paid rejected" $(code -X PATCH -d "{\"section\":\"hotels\",\"hotelName\":\"Lake Resort\",\"amount\":100}" $B/api/tours/$TID/lines/$HL) 400
+PID=$(echo "$R" | jq_ "d['tour']['hotels'][0]['payments'][1]['_id']")
+check "payment removed" $(req -X DELETE "$B/api/tours/$TID/lines/$HL/payments?section=hotels&payment=$PID" | jq_ "int(d['tour']['hotels'][0]['due'])") 40000
+check "vendor ledger due" $(req $B/api/vendors/$VH | jq_ "int(d['totals']['due'])") 40000
+check "link invoice → revenue & profit" $(req -X PATCH -d "{\"name\":\"E2E Kashmir Group\",\"destination\":\"Srinagar\",\"startDate\":\"$TODAY\",\"endDate\":\"$NEXT\",\"pax\":12,\"invoices\":[\"$IID\"]}" $B/api/tours/$TID | jq_ "'%d' % (d['summary']['revenue'] - d['summary']['cost'] - d['summary']['profit'])") 0
+check "find tour by invoice" $(req "$B/api/tours?invoice=$IID" | jq_ "len(d['items'])") 1
+check "operation file from invoice reuses tour" $(req -d "{\"fromInvoice\":\"$IID\"}" $B/api/tours | jq_ "d.get('existed')") True
+echo "Inventory"
+IT=$(req -d '{"name":"E2E Basmati rice","category":"grocery","unit":"kg","minStock":10}' $B/api/inventory | jq_ "d['item']['_id']")
+req -d "{\"type\":\"in\",\"quantity\":50,\"rate\":80,\"paid\":2000,\"vendor\":\"$VG\",\"date\":\"$TODAY\"}" $B/api/inventory/$IT/movements >/dev/null
+check "moving average cost" $(req -d "{\"type\":\"in\",\"quantity\":50,\"rate\":100,\"paid\":0,\"date\":\"$TODAY\"}" $B/api/inventory/$IT/movements | jq_ "'%g/%g' % (d['item']['stock'], d['item']['avgCost'])") 100/90
+check "issue more than stock rejected" $(code -d "{\"type\":\"out\",\"quantity\":500,\"tour\":\"$TID\",\"date\":\"$TODAY\"}" $B/api/inventory/$IT/movements) 400
+OUT=$(req -d "{\"type\":\"out\",\"quantity\":20,\"tour\":\"$TID\",\"date\":\"$TODAY\"}" $B/api/inventory/$IT/movements | jq_ "d['movement']['_id']")
+check "issue lowers stock" $(req $B/api/inventory/$IT | jq_ "'%g' % d['item']['stock']") 80
+check "issue adds tour grocery line at avg cost" $(req $B/api/tours/$TID | jq_ "int(d['summary']['categories']['grocery']['amount'])") 1800
+check "vendor purchase due" $(req $B/api/vendors/$VG | jq_ "int(d['totals']['due'])") 2000
+check "negative adjust beyond stock rejected" $(code -d "{\"type\":\"adjust\",\"quantity\":-500,\"date\":\"$TODAY\",\"note\":\"recount\"}" $B/api/inventory/$IT/movements) 400
+GL=$(req $B/api/tours/$TID | jq_ "[e for e in d['tour']['expenses'] if e.get('stockMovement')][0]['_id']")
+req -X DELETE "$B/api/tours/$TID/lines/$GL?section=expenses" >/dev/null
+check "deleting store line returns stock" $(req $B/api/inventory/$IT | jq_ "'%g' % d['item']['stock']") 100
+check "low stock flag" $(req -d "{\"type\":\"adjust\",\"quantity\":-95,\"date\":\"$TODAY\",\"note\":\"damaged\"}" $B/api/inventory/$IT/movements >/dev/null; req $B/api/inventory | jq_ "[i for i in d['items'] if i['_id']=='$IT'][0]['low']") True
+check "delete purchase already used blocked" $(code -X DELETE $B/api/inventory/movements/$(req $B/api/inventory/$IT | jq_ "[m for m in d['movements'] if m['type']=='in'][-1]['_id']")) 409
+check "item with history can't be deleted" $(code -X DELETE $B/api/inventory/$IT) 409
+check "used vendor is deactivated not deleted" $(req -X DELETE $B/api/vendors/$VH | jq_ "d.get('deactivated')") True
+OUT=$(req -d "{\"type\":\"out\",\"quantity\":5,\"tour\":\"$TID\",\"date\":\"$TODAY\"}" $B/api/inventory/$IT/movements | jq_ "d['movement']['_id']")
+check "deleting tour returns issued stock" $(req -X DELETE $B/api/tours/$TID >/dev/null; req $B/api/inventory/$IT | jq_ "'%g' % d['item']['stock']") 5
+req -X DELETE $B/api/staff/$SID2 >/dev/null
 echo "Agent permissions"
 cp $J $A; J=$(mktemp)
 check "agent login" $(code -d '{"email":"priya@demo.aalattravels.in","password":"Demo@1234"}' $B/api/auth/login) 200
@@ -185,6 +239,8 @@ OTHER=$(curl -s -b $A "$B/api/leads?limit=100" | python3 -c "import json,sys;d=j
 check "agent blocked from others' lead" $(code $B/api/leads/$OTHER) 403
 check "agent blocked from reports" $(code $B/api/reports) 403
 check "agent cannot change settings" $(code -X PATCH -d '{"company":{"name":"X"}}' $B/api/settings) 403
+check "agent blocked from operations" $(code $B/api/tours) 403
+check "agent blocked from vendors" $(code $B/api/vendors) 403
 check "agent cannot delete lead" $(code -X DELETE $B/api/leads/$OTHER) 403
 check "agent cannot bill another agent's lead" $(code -d "{\"lead\":\"$OTHER\",\"issueDate\":\"$TODAY\",\"dueDate\":\"$NEXT\",\"items\":[{\"description\":\"Pkg\",\"quantity\":1,\"rate\":100}]}" $B/api/invoices) 403
 echo; echo "PASSED $pass  FAILED $fail"

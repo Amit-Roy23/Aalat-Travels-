@@ -2,7 +2,7 @@
 import { use, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Ban, Copy, Printer, IndianRupee, MessageCircle, Pencil, Send, Trash2, X } from "lucide-react";
+import { ArrowLeft, Ban, Briefcase, Copy, Printer, IndianRupee, MessageCircle, Pencil, Send, Trash2, X } from "lucide-react";
 import { api, useApi } from "@/lib/client";
 import { fmtDate, money, toDateInput, waLink } from "@/lib/format";
 import { PAYMENT_METHODS, paymentMethodLabel } from "@/lib/constants";
@@ -28,6 +28,14 @@ export default function InvoicePage({ params }: { params: Promise<{ id: string }
   const { id } = use(params);
   const me = useMe();
   const router = useRouter();
+  const openOps = async () => {
+    try {
+      const r = await api<{ tour: { _id: string }; existed?: boolean }>("/api/tours", { body: { fromInvoice: id } });
+      router.push(`/operations/${r.tour._id}`);
+    } catch (e) {
+      toast((e as Error).message, "error");
+    }
+  };
   const { toast, confirm } = useUi();
   const { data, error, mutate } = useApi<Res>(`/api/invoices/${id}`);
   const [pay, setPay] = useState(false);
@@ -120,6 +128,11 @@ export default function InvoicePage({ params }: { params: Promise<{ id: string }
                 Copy link
               </Button>
             </>
+          )}
+          {me.user.role === "admin" && inv.state !== "cancelled" && (
+            <Button size="sm" variant="outline" icon={<Briefcase className="h-4 w-4" />} onClick={openOps} title="Track hotel, car, staff and expense costs for this tour">
+              Operation file
+            </Button>
           )}
           {inv.state !== "cancelled" && (
             <Link href={`/invoices/${id}/edit`}>

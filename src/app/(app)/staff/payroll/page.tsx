@@ -75,8 +75,8 @@ export default function PayrollPage() {
         title="Payroll"
         subtitle="Monthly salary from attendance — leave, absences, advances and bonuses."
         actions={
-          <div className="flex items-center gap-2">
-            <input className="input h-10 w-44" type="month" max={todayKeyIST().slice(0, 7)} value={month} onChange={(e) => e.target.value && setMonth(e.target.value)} aria-label="Month" />
+          <div className="flex flex-wrap items-center gap-2">
+            <input className="input h-10 w-full min-[380px]:w-44" type="month" max={todayKeyIST().slice(0, 7)} value={month} onChange={(e) => e.target.value && setMonth(e.target.value)} aria-label="Month" />
             <Button onClick={generate} loading={busy} icon={<RefreshCw className="h-4 w-4" />}>
               {data?.items.length ? "Refresh from attendance" : "Generate payroll"}
             </Button>

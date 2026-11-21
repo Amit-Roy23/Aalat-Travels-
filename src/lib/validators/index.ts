@@ -238,3 +238,56 @@ export const PayrollPatch = z.object({
   otherDeduction: z.coerce.number().min(0).max(1e7).optional(),
   note: str(300).optional(),
 });
+
+/* ───────── Operations ───────── */
+const optDate = z.union([z.literal(""), z.null(), z.coerce.date()]).optional();
+const money0 = z.coerce.number().min(0, "Amount cannot be negative").max(1e9);
+export const OpTourInput = z
+  .object({
+    name: str(160).min(2, "Tour name is required"),
+    destination: optStr(120),
+    startDate: z.coerce.date(),
+    endDate: optDate,
+    pax: z.coerce.number().int().min(0).max(10000).default(0),
+    status: z.enum(["planned", "ongoing", "completed", "cancelled"]).default("planned"),
+    invoices: z.array(z.string()).max(50).default([]),
+    notes: optStr(2000),
+  })
+  .refine((t) => !(t.endDate instanceof Date) || t.endDate >= t.startDate, { message: "End date can't be before the start date", path: ["endDate"] });
+
+const firstPayment = { advance: z.coerce.number().min(0).max(1e9).optional().default(0), advanceDate: optDate, advanceMethod: z.enum(["upi", "bank_transfer", "cash", "card", "cheque"]).optional().default("cash") };
+export const TourLineInput = z.discriminatedUnion("section", [
+  z.object({ section: z.literal("hotels"), vendor: z.string().optional().nullable(), hotelName: str(160).min(1, "Hotel name is required"), city: optStr(80), checkIn: optDate, checkOut: optDate, rooms: z.coerce.number().int().min(0).max(500).default(0), roomType: optStr(80), mealPlan: optStr(80), amount: money0, notes: optStr(500), ...firstPayment }),
+  z.object({ section: z.literal("cars"), vendor: z.string().optional().nullable(), vehicleType: optStr(80), carNumber: optStr(30), driverName: optStr(80), driverPhone: z.string().trim().max(20).optional().default(""), fromDate: optDate, toDate: optDate, amount: money0, notes: optStr(500), ...firstPayment }),
+  z.object({ section: z.literal("staff"), staff: z.string().optional().nullable(), name: str(120).optional().default(""), role: optStr(80), days: z.coerce.number().min(0).max(365).default(0), amount: money0, notes: optStr(500), ...firstPayment }),
+  z.object({ section: z.literal("expenses"), category: z.enum(["train", "flight_bus", "gas", "grocery", "fresh", "meat_fish", "fuel", "food", "entry", "guide", "misc"]).default("misc"), description: optStr(200), vendor: z.string().optional().nullable(), date: optDate, quantity: z.coerce.number().min(0).max(1e6).default(0), unit: optStr(20), amount: money0, notes: optStr(500), ...firstPayment }),
+]);
+export const LinePaymentInput = z.object({ section: z.enum(["hotels", "cars", "staff", "expenses"]), amount: z.coerce.number().positive("Enter an amount"), date: z.coerce.date(), method: z.enum(["upi", "bank_transfer", "cash", "card", "cheque"]).default("cash"), note: optStr(200) });
+
+export const VendorInput = z.object({
+  name: str(160).min(2, "Vendor name is required"),
+  type: z.enum(["hotel", "transport", "grocery", "fresh", "gas", "tickets", "restaurant", "guide", "other"]).default("other"),
+  contactPerson: optStr(80),
+  phone,
+  email,
+  city: optStr(80),
+  address: optStr(300),
+  gstin: optStr(20),
+  bankDetails: optStr(500),
+  upiId: optStr(100),
+  notes: optStr(1000),
+  active: z.boolean().default(true),
+});
+
+export const InventoryItemInput = z.object({
+  name: str(120).min(2, "Item name is required"),
+  category: z.enum(["grocery", "fresh", "meat_fish", "gas", "misc"]).default("grocery"),
+  unit: str(20).min(1).default("kg"),
+  minStock: z.coerce.number().min(0).max(1e7).default(0),
+  notes: optStr(500),
+});
+export const StockMovementInput = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("in"), quantity: z.coerce.number().positive("Enter the quantity"), rate: z.coerce.number().min(0), paid: z.coerce.number().min(0).default(0), vendor: z.string().optional().nullable(), date: z.coerce.date(), note: optStr(200) }),
+  z.object({ type: z.literal("out"), quantity: z.coerce.number().positive("Enter the quantity"), tour: z.string().min(1, "Choose the tour"), date: z.coerce.date(), note: optStr(200) }),
+  z.object({ type: z.literal("adjust"), quantity: z.coerce.number().refine((v) => v !== 0, "Enter a non-zero quantity"), date: z.coerce.date(), note: str(200).min(2, "Give a reason (e.g. damaged, recount)") }),
+]);

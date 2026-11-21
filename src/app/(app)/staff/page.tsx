@@ -240,7 +240,7 @@ function DayRegister({ date }: { date: string }) {
         {late > 0 && <span className="chip bg-sun-soft text-sun">Late: {late}</span>}
         {unmarked > 0 && <span className="chip bg-coral-soft text-coral">Not marked: {unmarked}</span>}
         {unmarked > 0 && (
-          <div className="ml-auto flex gap-1.5">
+          <div className="ml-auto flex flex-wrap gap-1.5">
             <Button size="sm" variant="outline" onClick={() => bulk("present")}>
               Mark the rest present
             </Button>
