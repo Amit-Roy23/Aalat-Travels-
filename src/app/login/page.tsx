@@ -4,7 +4,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowRight, Eye, EyeOff } from "lucide-react";
 import { api } from "@/lib/client";
 import { Button, Field } from "@/components/ui";
-import { LogoMark } from "@/components/logo";
+import { LogoSeal } from "@/components/logo";
 import { AuthArt } from "./auth-art";
 
 function LoginForm() {
@@ -38,9 +38,8 @@ function LoginForm() {
 
   return (
     <form onSubmit={submit} className="w-full max-w-sm">
-      <div className="mb-8 flex items-center gap-3 lg:hidden">
-        <LogoMark className="h-11 w-11" />
-        <p className="font-display text-xl font-extrabold">Aalat Travels</p>
+      <div className="mb-8 flex flex-col items-center lg:hidden">
+        <LogoSeal className="h-28 w-28 shadow-card" />
       </div>
       <h1 className="font-display text-3xl font-extrabold tracking-tight">Welcome back 👋</h1>
       <p className="mt-1.5 text-sm text-muted">Sign in to manage leads, chats and bookings.</p>

@@ -1,6 +1,7 @@
 "use client";
 // Standalone print view (no app shell): opens the browser print dialog → print or "Save as PDF".
-import { Suspense, use, useEffect, useState } from "react";
+import { Suspense, use, useEffect, useRef, useState } from "react";
+import { fitToPage, usePrintFit } from "@/components/print-fit";
 import { useSearchParams } from "next/navigation";
 import { Printer, X } from "lucide-react";
 import { ClassicInvoice, type ClassicSettings } from "@/components/invoice-classic";
@@ -12,6 +13,8 @@ function PrintView({ id }: { id: string }) {
   const sp = useSearchParams();
   const [data, setData] = useState<Res | null>(null);
   const [err, setErr] = useState("");
+  const fitRef = useRef<HTMLDivElement>(null);
+  usePrintFit(fitRef, [data]);
   useEffect(() => {
     fetch(`/api/invoices/${id}`)
       .then(async (r) => {
@@ -25,7 +28,15 @@ function PrintView({ id }: { id: string }) {
   useEffect(() => {
     if (!data || sp.get("auto") === "0") return;
     let cancelled = false;
-    document.fonts.ready.then(() => setTimeout(() => !cancelled && window.print(), 350));
+    // wait for fonts and the logo image so the printout is complete
+    const images = Array.from(document.images).map((img) => (img.complete ? Promise.resolve() : img.decode().catch(() => undefined)));
+    Promise.all([document.fonts.ready, ...images]).then(() =>
+      setTimeout(() => {
+        if (cancelled) return;
+        if (fitRef.current) fitToPage(fitRef.current);
+        window.print();
+      }, 350),
+    );
     return () => {
       cancelled = true;
     };
@@ -38,7 +49,7 @@ function PrintView({ id }: { id: string }) {
       <div className="no-print mx-auto mb-4 flex max-w-[820px] items-center justify-between gap-2">
         <p className="text-sm font-medium text-[#555]">Choose “Save as PDF” in the print dialog to download.</p>
         <div className="flex gap-2">
-          <button onClick={() => window.print()} className="inline-flex items-center gap-2 rounded-xl bg-[#B5173B] px-4 py-2 text-sm font-semibold text-white">
+          <button onClick={() => window.print()} className="inline-flex items-center gap-2 rounded-xl bg-[#C80E16] px-4 py-2 text-sm font-semibold text-white">
             <Printer className="h-4 w-4" /> Print / Save PDF
           </button>
           <button onClick={() => window.close()} className="inline-flex items-center gap-1 rounded-xl border border-[#ccc] bg-white px-3 py-2 text-sm font-semibold text-[#333]">
@@ -46,7 +57,9 @@ function PrintView({ id }: { id: string }) {
           </button>
         </div>
       </div>
-      {template === "classic" ? <ClassicInvoice inv={data.invoice} company={data.company} settings={data.invoiceSettings} /> : <InvoiceDocument inv={data.invoice} company={data.company} bank={data.invoiceSettings} className="mx-auto max-w-4xl" />}
+      <div ref={fitRef} className="fit-page mx-auto max-w-4xl">
+        {template === "classic" ? <ClassicInvoice inv={data.invoice} company={data.company} settings={data.invoiceSettings} /> : <InvoiceDocument inv={data.invoice} company={data.company} bank={data.invoiceSettings} />}
+      </div>
     </div>
   );
 }

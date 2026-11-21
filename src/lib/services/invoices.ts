@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import { Counter, Invoice } from "../models";
 import { round2, startOfTodayTZ } from "../format";
+import { dueByToday, installmentAmounts, type InstallmentInput } from "../installments";
 
 export type ItemInput = { description: string; quantity: number; rate: number };
 
@@ -14,12 +15,16 @@ export function computeTotals(items: ItemInput[], discount: number, taxRate: num
   return { items: lines, subtotal, discount: disc, taxAmount, total };
 }
 
-export function deriveStatus(inv: { state: string; total: number; amountPaid: number; dueDate: Date | string }) {
+export function deriveStatus(inv: { state: string; total: number; amountPaid: number; dueDate: Date | string; installments?: InstallmentInput[] }) {
   if (inv.state === "cancelled") return "cancelled" as const;
   if (inv.state === "draft") return "draft" as const;
   const balance = round2(inv.total - inv.amountPaid);
   if (balance <= 0) return "paid" as const;
-  if (new Date(inv.dueDate).getTime() < startOfTodayTZ().getTime()) return "overdue" as const;
+  const sod = startOfTodayTZ();
+  // With a part-payment schedule, the invoice is overdue as soon as an instalment that has fallen due is unpaid.
+  if (inv.installments?.length) {
+    if (inv.amountPaid + 0.005 < dueByToday(inv.total, inv.installments, sod)) return "overdue" as const;
+  } else if (new Date(inv.dueDate).getTime() < sod.getTime()) return "overdue" as const;
   if (inv.amountPaid > 0) return "partial" as const;
   return "sent" as const;
 }
@@ -29,7 +34,14 @@ export function recalc(inv: InstanceType<typeof Invoice>) {
   const paid = round2((inv.payments ?? []).reduce((s: number, p: { amount?: number }) => s + (p.amount || 0), 0));
   inv.amountPaid = paid;
   inv.balance = round2(Math.max(inv.total - paid, 0));
-  inv.status = deriveStatus({ state: inv.state, total: inv.total, amountPaid: paid, dueDate: inv.dueDate });
+  const list = (inv.installments ?? []) as unknown as (InstallmentInput & { amount: number })[];
+  if (list.length) {
+    // keep instalment amounts in step with the total; the invoice is due when the last instalment is due
+    const amounts = installmentAmounts(inv.total, list);
+    list.forEach((it, i) => (it.amount = amounts[i]));
+    inv.dueDate = new Date(Math.max(...list.map((i) => new Date(i.dueDate).getTime())));
+  }
+  inv.status = deriveStatus({ state: inv.state, total: inv.total, amountPaid: paid, dueDate: inv.dueDate, installments: list });
 }
 
 /**
@@ -70,7 +82,14 @@ export function shareToken() {
 /** Flip unpaid / partially-paid invoices whose due date has passed to "overdue". */
 export async function refreshOverdue() {
   const today = startOfTodayTZ();
-  await Invoice.updateMany({ state: "issued", balance: { $gt: 0 }, dueDate: { $lt: today }, status: { $in: ["sent", "partial"] } }, { $set: { status: "overdue" } });
+  await Invoice.updateMany({ state: "issued", balance: { $gt: 0 }, dueDate: { $lt: today }, status: { $in: ["sent", "partial"] }, "installments.0": { $exists: false } }, { $set: { status: "overdue" } });
+  // invoices with a part-payment schedule: an instalment may have fallen due before the final due date
+  const scheduled = await Invoice.find({ state: "issued", balance: { $gt: 0 }, status: { $in: ["sent", "partial"] }, "installments.0": { $exists: true }, "installments.dueDate": { $lt: today } });
+  for (const inv of scheduled) {
+    const before = inv.status;
+    recalc(inv);
+    if (inv.status !== before) await inv.save();
+  }
 }
 
 type TourIn = { startDate?: Date | string | null; endDate?: Date | string | null; [k: string]: unknown } | undefined;

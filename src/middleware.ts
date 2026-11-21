@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { SESSION_COOKIE, verifySession } from "./lib/session";
 
-const PUBLIC_PAGES = ["/login", "/setup", "/i/"];
+const PUBLIC_PAGES = ["/login", "/setup", "/i/", "/it/"];
 const PUBLIC_API = ["/api/auth/login", "/api/setup", "/api/webhooks/", "/api/public/", "/api/health"];
 
 export async function middleware(req: NextRequest) {
@@ -19,5 +19,5 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|icon.svg|manifest.webmanifest|robots.txt).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|brand/|manifest.webmanifest|robots.txt).*)"],
 };

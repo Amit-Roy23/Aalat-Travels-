@@ -5,6 +5,7 @@ import { SCENARIOS } from "./demo-scenarios";
 import { computeTotals, deriveStatus, nextInvoiceNumber, shareToken } from "./services/invoices";
 import { getSettings } from "./services/settings";
 import { round2 } from "./format";
+import { clearOpsDemo, seedOpsDemo } from "./seed-ops";
 import type { LeadSource, LeadStatus } from "./constants";
 
 export const DEMO_EMAIL_DOMAIN = "demo.aalattravels.in";
@@ -230,7 +231,7 @@ export async function seedDemo(adminId?: string) {
     });
     activities.push({ customer: c._id, lead: lead._id, type: "invoice", message: `Invoice created · ₹${totals.total.toLocaleString("en-IN")}`, createdAt: issueDate });
   }
-  await Invoice.insertMany(invDocs);
+  const insertedInvoices = await Invoice.insertMany(invDocs);
 
   // ── follow-ups
   const open = leadDocs.filter((l) => ["new", "interested", "follow_up"].includes(l.status));
@@ -337,10 +338,16 @@ export async function seedDemo(adminId?: string) {
       { user: a._id, type: "invoice", title: "2 invoices are overdue", body: "Follow up on pending balances", link: `/invoices?status=overdue` },
     ]),
   );
+  try {
+    await seedOpsDemo({ adminId: admin?._id as never, invoices: insertedInvoices as never, payroll: settings.payroll as never });
+  } catch (e) {
+    console.error("Operations demo data failed", e);
+  }
   return { leads: leadDocs.length + SCENARIOS.length, customers: custDocs.length, invoices: invDocs.length, followUps: fus.length + SCENARIOS.length - 1, conversations: SCENARIOS.length };
 }
 
 export async function clearDemo() {
+  await clearOpsDemo();
   const demoLeads = await Lead.find({ isDemo: true }, { _id: 1 }).lean();
   const demoCustomers = await Customer.find({ isDemo: true }, { _id: 1 }).lean();
   const leadIds = demoLeads.map((l) => l._id);

@@ -1,6 +1,8 @@
 import { cn, displayPhone, fmtDate, money } from "@/lib/format";
 import { invoiceStatusMeta, paymentMethodLabel } from "@/lib/constants";
-import { LogoMark } from "./logo";
+import { PartnerLogos, type ClassicSettings } from "./invoice-classic";
+import { PayQr } from "./pay-qr";
+import { allocateInstallments } from "@/lib/installments";
 
 export type InvoiceDocData = {
   number: string;
@@ -21,20 +23,22 @@ export type InvoiceDocData = {
   customer: { name: string; phone?: string; altPhone?: string; email?: string; address?: string; city?: string; gstin?: string };
   payments?: { amount: number; date: string; method: string }[];
   taxType?: string;
+  remarks?: string;
+  installments?: { _id?: string; label: string; percent: number; dueDate: string; amount?: number }[];
   tour?: { name?: string; duration?: string; adults?: number; children?: number; rooms?: number; startDate?: string; endDate?: string; startPoint?: string; endPoint?: string; foodPlan?: string; propertyType?: string; vehicleSeat?: string; vehicleType?: string };
 };
-export type CompanyData = { name?: string; tagline?: string; phone?: string; email?: string; website?: string; address?: string; gstin?: string; regNo?: string; logo?: string };
+export type CompanyData = { name?: string; tagline?: string; phone?: string; email?: string; website?: string; address?: string; gstin?: string; regNo?: string; msmeNo?: string; logo?: string };
 
 const stampTone: Record<string, string> = { paid: "border-leaf text-leaf", overdue: "border-coral text-coral", partial: "border-sun text-sun", sent: "border-sky text-sky", draft: "border-slate2 text-slate2", cancelled: "border-slate2 text-slate2" };
 
-export function InvoiceDocument({ inv, company, bank, className }: { inv: InvoiceDocData; company: CompanyData; bank?: { bankDetails?: string; upiId?: string }; className?: string }) {
+export function InvoiceDocument({ inv, company, bank, className }: { inv: InvoiceDocData; company: CompanyData; bank?: ClassicSettings; className?: string }) {
   return (
     <article className={cn("print-area overflow-hidden rounded-3xl border border-line bg-white text-[#13202E] shadow-card", className)}>
       <div className="relative bg-sidebar px-6 py-6 text-white sm:px-10 sm:py-8">
         <div className="absolute -right-10 -top-16 h-48 w-48 rounded-full bg-hl/20 blur-2xl" />
         <div className="relative flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex items-center gap-3">
-            {company.logo ? <img src={company.logo} alt="" className="h-12 w-12 rounded-full bg-white object-contain" /> : <LogoMark className="h-12 w-12" />}
+            <img src={company.logo || "/brand/aalat-seal.png"} alt="" className="h-14 w-14 rounded-full bg-white object-contain" />
             <div>
               <p className="font-display text-2xl font-extrabold tracking-tight">{company.name || "Aalat Travels"}</p>
               {company.tagline && <p className="text-sm text-white/60">{company.tagline}</p>}
@@ -98,6 +102,7 @@ export function InvoiceDocument({ inv, company, bank, className }: { inv: Invoic
               {[company.address, company.phone, company.email, company.website].filter(Boolean).join("\n")}
               {company.gstin && `\nGSTIN: ${company.gstin}`}
               {company.regNo && `\nReg No.: ${company.regNo}`}
+              {company.msmeNo && `\nMSME (Udyam) No.: ${company.msmeNo}`}
             </p>
           </div>
         </div>
@@ -206,15 +211,45 @@ export function InvoiceDocument({ inv, company, bank, className }: { inv: Invoic
             </ul>
           </div>
         )}
-        {(bank?.bankDetails || bank?.upiId) && inv.balance > 0 && (
+        {!!inv.installments?.length && (
+          <div className="mt-6">
+            <p className="text-[10.5px] font-bold uppercase tracking-wider text-[#6b7078]">Payment schedule</p>
+            <table className="mt-1.5 w-full text-sm">
+              <tbody>
+                {allocateInstallments(inv.total, inv.installments, inv.amountPaid).map((r, i) => (
+                  <tr key={i} className="border-b border-dashed border-[#e6e1d7]">
+                    <td className="py-1.5">
+                      {r.label} <span className="text-[#6b7078]">({r.percent}%)</span>
+                    </td>
+                    <td className="py-1.5 text-[#52575f]">by {fmtDate(r.dueDate)}</td>
+                    <td className="py-1.5 text-right font-semibold tabular-nums">{money(r.amount)}</td>
+                    <td className={cn("w-24 py-1.5 text-right text-xs font-bold", r.status === "paid" ? "text-[#228F52]" : r.status === "overdue" ? "text-[#C80E16]" : "text-[#B58600]")}>
+                      {r.status === "paid" ? "✓ Paid" : r.status === "partial" ? `Paid ${money(r.paid)}` : r.status === "overdue" ? "Overdue" : "Due"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        {inv.balance > 0 && inv.status !== "draft" && inv.status !== "cancelled" && (bank?.bankDetails || bank?.upiId || bank?.paymentQr) && (
+          <div className="mt-6 flex items-start gap-4 rounded-xl border border-[#e6e1d7] p-4 text-sm">
+            <div className="min-w-0 flex-1">
+              <p className="mb-1 text-[10.5px] font-bold uppercase tracking-wider text-[#6b7078]">How to pay</p>
+              {bank.upiId && (
+                <p>
+                  <b>UPI:</b> {bank.upiId}
+                </p>
+              )}
+              {bank.bankDetails && <p className="whitespace-pre-line">{bank.bankDetails}</p>}
+            </div>
+            <PayQr settings={{ ...bank, companyName: company.name }} amount={inv.balance} invoiceNumber={inv.number} size={96} accent="#1F0B16" />
+          </div>
+        )}
+        {inv.remarks?.trim() && (
           <div className="mt-6 rounded-xl border border-[#e6e1d7] p-4 text-sm">
-            <p className="mb-1 text-[10.5px] font-bold uppercase tracking-wider text-[#6b7078]">How to pay</p>
-            {bank.upiId && (
-              <p>
-                <b>UPI:</b> {bank.upiId}
-              </p>
-            )}
-            {bank.bankDetails && <p className="whitespace-pre-line">{bank.bankDetails}</p>}
+            <p className="mb-1 text-[10.5px] font-bold uppercase tracking-wider text-[#6b7078]">Remarks</p>
+            <p className="whitespace-pre-line">{inv.remarks.trim()}</p>
           </div>
         )}
         {inv.notes && <p className="mt-6 text-sm italic text-[#52575f]">{inv.notes}</p>}
@@ -225,6 +260,7 @@ export function InvoiceDocument({ inv, company, bank, className }: { inv: Invoic
           </div>
         )}
       </div>
+      {bank && <PartnerLogos settings={bank} className="border-t border-[#e6e1d7] py-4 sm:px-10" />}
     </article>
   );
 }

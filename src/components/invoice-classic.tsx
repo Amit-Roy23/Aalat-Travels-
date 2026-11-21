@@ -1,10 +1,13 @@
 // Aalat Travels' own invoice format, recreated from the client's printed invoice book.
-// Crimson section bands, customer / tour / payment details, policies and signatures — prints on one A4 page.
+// Bi-colour (logo red + logo yellow) section bands, customer / tour / payment details, policies and
+// signatures, with the Aalat seal — prints on one A4 page.
 import "@fontsource/dancing-script/700.css";
 import { displayPhone, fmtDate, money } from "@/lib/format";
 import { INVOICE_DEFAULTS } from "@/lib/invoice-defaults";
 import { invoiceStatusMeta } from "@/lib/constants";
 import type { CompanyData, InvoiceDocData } from "./invoice-doc";
+import { PayQr } from "./pay-qr";
+import { allocateInstallments } from "@/lib/installments";
 
 export type ClassicSettings = {
   cancellationPolicy?: string;
@@ -14,9 +17,42 @@ export type ClassicSettings = {
   footerNote?: string;
   bankDetails?: string;
   upiId?: string;
+  showPartnerLogos?: boolean;
+  paymentQr?: string;
+  showPaymentQr?: boolean;
+  autoUpiQr?: boolean;
+  partnerTitle?: string;
+  partnerLogos?: { name: string; src: string }[];
 };
 
-const RED = "#B5173B";
+/** Strip of partner / tourism-board logos printed at the bottom of the bill. */
+export function PartnerLogos({ settings, className = "" }: { settings: ClassicSettings; className?: string }) {
+  const logos = settings.showPartnerLogos === false ? [] : (settings.partnerLogos ?? []);
+  if (!logos.length) return null;
+  return (
+    <div className={`px-3 py-2 sm:px-5 ${className}`}>
+      {settings.partnerTitle && <p className="mb-1.5 text-center text-[9px] font-bold uppercase tracking-[0.18em] text-[#6b6b6b] sm:text-[10px]">{settings.partnerTitle}</p>}
+      <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 sm:justify-between sm:gap-x-4">
+        {logos.map((l, i) => (
+          <img
+            key={l.src.slice(-40) + i}
+            src={l.src}
+            alt={l.name}
+            title={l.name}
+            className={`w-auto object-contain ${logos.length > 6 ? "h-9 max-w-[120px] sm:h-[50px] sm:max-w-[150px]" : "h-10 max-w-[130px] sm:h-[60px] sm:max-w-[175px]"}`}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Colours taken from the Aalat logo
+const RED = "#C80E16";
+const YEL = "#F8C00B";
+const GOLD = "#B58600"; // darker yellow for text on white (readable)
+const YEL_SOFT = "#FFF5D1";
+const DOT = "#E7B92E";
 
 function lines(s?: string) {
   return (s ?? "").split("\n").map((l) => l.trim()).filter(Boolean);
@@ -24,8 +60,10 @@ function lines(s?: string) {
 
 function Band({ children }: { children: React.ReactNode }) {
   return (
-    <div className="py-[3px] text-center text-[10.5px] font-bold uppercase tracking-[0.16em] text-white sm:text-[12.5px]" style={{ background: RED }}>
+    <div className="py-[3px] text-center text-[10.5px] font-bold uppercase tracking-[0.16em] text-white sm:text-[12.5px]" style={{ background: RED, borderBottom: `3px solid ${YEL}` }}>
+      <span className="mr-2 inline-block h-[7px] w-[7px] rotate-45 align-middle" style={{ background: YEL }} />
       {children}
+      <span className="ml-2 inline-block h-[7px] w-[7px] rotate-45 align-middle" style={{ background: YEL }} />
     </div>
   );
 }
@@ -37,7 +75,7 @@ function Row({ label, value, className = "" }: { label: string; value?: React.Re
       <span className="shrink-0 font-bold" style={{ color: RED }}>
         {label}:
       </span>
-      <span className="min-w-0 flex-1 truncate border-b border-dotted border-[#c9a3ac] pb-px font-semibold text-[#1d1d1f]" title={typeof value === "string" ? value : undefined}>
+      <span className="min-w-0 flex-1 truncate border-b-[1.5px] border-dotted pb-px font-semibold text-[#1d1d1f]" style={{ borderColor: DOT }} title={typeof value === "string" ? value : undefined}>
         {value || " "}
       </span>
     </div>
@@ -45,29 +83,8 @@ function Row({ label, value, className = "" }: { label: string; value?: React.Re
 }
 
 function Emblem({ logo, name }: { logo?: string; name: string }) {
-  if (logo) return <img src={logo} alt={`${name} logo`} className="h-[64px] w-[64px] rounded-full object-contain sm:h-[86px] sm:w-[86px]" />;
-  return (
-    <svg viewBox="0 0 100 100" className="h-[64px] w-[64px] sm:h-[86px] sm:w-[86px]" aria-label={`${name} emblem`}>
-      <defs>
-        <path id="emb-top" d="M 16 50 A 34 34 0 0 1 84 50" />
-        <path id="emb-bot" d="M 20 56 A 31 31 0 0 0 80 56" />
-      </defs>
-      <circle cx="50" cy="50" r="47" fill="#fff" stroke={RED} strokeWidth="2.5" />
-      <circle cx="50" cy="50" r="40" fill="none" stroke={RED} strokeWidth="0.8" />
-      <text fontSize="9" fontWeight="700" fill={RED} letterSpacing="1.2">
-        <textPath href="#emb-top" startOffset="50%" textAnchor="middle">
-          {name.toUpperCase()}
-        </textPath>
-      </text>
-      <text fontSize="6.5" fontWeight="600" fill={RED} letterSpacing="1">
-        <textPath href="#emb-bot" startOffset="50%" textAnchor="middle">
-          A CREATIVE MIND
-        </textPath>
-      </text>
-      <path d="M50 30 L60 52 H40 Z M44 52 L50 40 L56 52" fill="none" stroke={RED} strokeWidth="2.2" strokeLinejoin="round" />
-      <path d="M33 58 Q50 50 67 58" fill="none" stroke={RED} strokeWidth="2" strokeLinecap="round" />
-    </svg>
-  );
+  // An uploaded logo (Settings → Company) wins; otherwise the official Aalat seal is used.
+  return <img src={logo || "/brand/aalat-seal.png"} alt={`${name} logo`} className="h-[72px] w-[72px] shrink-0 rounded-full object-contain sm:h-[104px] sm:w-[104px]" />;
 }
 
 export function ClassicInvoice({ inv, company, settings, className = "" }: { inv: InvoiceDocData; company: CompanyData; settings: ClassicSettings; className?: string }) {
@@ -90,9 +107,14 @@ export function ClassicInvoice({ inv, company, settings, className = "" }: { inv
 
   return (
     <article
-      className={`print-area classic-invoice relative mx-auto w-full max-w-[820px] overflow-hidden border-[2.5px] bg-[#fffafb] text-[11px] leading-snug text-[#1d1d1f] shadow-card sm:text-[13px] ${className}`}
-      style={{ borderColor: RED, fontFamily: "'Plus Jakarta Sans Variable', system-ui, sans-serif" }}
+      className={`print-area classic-invoice relative mx-auto w-full max-w-[820px] overflow-hidden border-[2.5px] bg-[#fffdf8] text-[11px] leading-snug text-[#1d1d1f] shadow-card sm:text-[13px] ${className}`}
+      style={{ borderColor: RED, boxShadow: `inset 0 0 0 3px #fff, inset 0 0 0 4.5px ${YEL}`, fontFamily: "'Plus Jakarta Sans Variable', system-ui, sans-serif" }}
     >
+      {/* bi-colour top stripe */}
+      <div className="flex h-[7px]">
+        <div className="flex-[3]" style={{ background: RED }} />
+        <div className="flex-[2]" style={{ background: YEL }} />
+      </div>
       {(inv.status === "paid" || inv.status === "cancelled" || inv.status === "draft") && (
         <div className="pointer-events-none absolute right-6 top-[38%] z-10 -rotate-12 rounded-lg border-[3px] px-3 py-1 text-base font-extrabold uppercase tracking-widest opacity-25 sm:text-2xl" style={{ borderColor: RED, color: RED }}>
           {status.label}
@@ -104,25 +126,26 @@ export function ClassicInvoice({ inv, company, settings, className = "" }: { inv
         <div className="flex items-center gap-2 sm:gap-4">
           <Emblem logo={company.logo} name={name} />
           <div className="min-w-0 flex-1 text-center">
-            <span className="inline-block px-5 py-[1px] text-[12px] font-extrabold tracking-[0.2em] text-white sm:text-[17px]" style={{ background: RED }}>
+            <span className="inline-block rounded-sm px-5 py-[1px] text-[12px] font-extrabold tracking-[0.2em] sm:text-[17px]" style={{ background: YEL, color: RED, boxShadow: `2px 2px 0 ${RED}` }}>
               INVOICE
             </span>
             <h1 className="mt-0.5 text-[26px] font-black uppercase leading-none tracking-[0.04em] sm:text-[44px]" style={{ color: RED, fontFamily: "'Bricolage Grotesque Variable', system-ui, sans-serif" }}>
               {name}
             </h1>
             {company.tagline && (
-              <p className="-mt-0.5 pr-2 text-right text-[16px] leading-tight sm:text-[24px]" style={{ color: RED, fontFamily: "'Dancing Script', cursive", fontWeight: 700 }}>
+              <p className="-mt-0.5 pr-2 text-right text-[16px] leading-tight sm:text-[24px]" style={{ color: GOLD, fontFamily: "'Dancing Script', cursive", fontWeight: 700 }}>
                 - {company.tagline}
               </p>
             )}
           </div>
         </div>
-        <div className="mt-1.5 flex flex-col gap-1 border-y-[1.5px] py-1.5 sm:flex-row sm:items-start sm:justify-between" style={{ borderColor: RED }}>
+        <div className="mt-1.5 flex flex-col gap-1 py-1.5 sm:flex-row sm:items-start sm:justify-between" style={{ borderTop: `2px solid ${YEL}`, borderBottom: `1.5px solid ${RED}` }}>
           <p className="whitespace-nowrap text-[18px] font-bold sm:text-[24px]" style={{ color: RED }}>
-            No. <span className="ml-1 font-mono text-[20px] font-extrabold tracking-wider text-[#1d1d1f] sm:text-[26px]">{inv.number}</span>
+            No. <span className="ml-1 rounded px-2 font-mono text-[20px] font-extrabold tracking-wider text-[#1d1d1f] sm:text-[26px]" style={{ background: YEL_SOFT, boxShadow: `inset 0 -2px 0 ${YEL}` }}>{inv.number}</span>
           </p>
           <div className="text-left text-[10.5px] font-semibold sm:text-right sm:text-[12.5px]" style={{ color: RED }}>
             {company.regNo && <p>Reg No. - {company.regNo}</p>}
+            {company.msmeNo && <p>MSME (Udyam) No. - {company.msmeNo}</p>}
             {company.gstin && <p>GST IN - {company.gstin}</p>}
             {company.phone && <p>Cont. No. : {company.phone}</p>}
             {company.address && <p>Corporate Office : {company.address}</p>}
@@ -178,7 +201,7 @@ export function ClassicInvoice({ inv, company, settings, className = "" }: { inv
             </thead>
             <tbody>
               {inv.items.map((it, i) => (
-                <tr key={i} className="border-t border-dotted border-[#c9a3ac]">
+                <tr key={i} className="border-t border-dotted border-[#E7B92E]">
                   <td className="px-3 py-[3px] sm:px-5">{it.description}</td>
                   <td className="py-[3px] text-right tabular-nums">{it.quantity}</td>
                   <td className="py-[3px] text-right tabular-nums">{money(it.rate)}</td>
@@ -186,7 +209,7 @@ export function ClassicInvoice({ inv, company, settings, className = "" }: { inv
                 </tr>
               ))}
               {inv.discount > 0 && (
-                <tr className="border-t border-dotted border-[#c9a3ac]">
+                <tr className="border-t border-dotted border-[#E7B92E]">
                   <td className="px-3 py-[3px] sm:px-5" colSpan={3}>
                     Less: Discount
                   </td>
@@ -211,16 +234,50 @@ export function ClassicInvoice({ inv, company, settings, className = "" }: { inv
           {igst ? (
             <div className="grid grid-cols-1 gap-x-5 min-[480px]:grid-cols-2">
               <Row label={`IGST (${inv.taxRate}%)`} value={money(inv.taxAmount)} />
-              <Row label="Grand Total" value={<span className="text-[1.08em] font-extrabold">{money(inv.total)}</span>} />
+              <Row label="Grand Total" value={<span className="rounded px-1.5 py-px text-[1.08em] font-extrabold" style={{ background: YEL_SOFT, color: RED, boxShadow: `inset 0 -2px 0 ${YEL}` }}>{money(inv.total)}</span>} />
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-x-5 min-[480px]:grid-cols-2 sm:grid-cols-[1fr_1fr_1.25fr] sm:gap-x-4">
               <Row label={`CGST${half ? ` (${half}%)` : ""}`} value={money(cgst)} />
               <Row label={`SGST${half ? ` (${half}%)` : ""}`} value={money(sgst)} />
-              <Row className="min-[480px]:col-span-2 sm:col-span-1" label="Grand Total" value={<span className="text-[1.08em] font-extrabold">{money(inv.total)}</span>} />
+              <Row className="min-[480px]:col-span-2 sm:col-span-1" label="Grand Total" value={<span className="rounded px-1.5 py-px text-[1.08em] font-extrabold" style={{ background: YEL_SOFT, color: RED, boxShadow: `inset 0 -2px 0 ${YEL}` }}>{money(inv.total)}</span>} />
             </div>
           )}
         </div>
+      </div>
+
+      {/* Part-payment schedule */}
+      {!!inv.installments?.length && (
+        <div className="border-t-[1.5px] px-3 py-1.5 sm:px-5" style={{ borderColor: RED }}>
+          <p className="mb-0.5 font-bold" style={{ color: RED }}>
+            Payment Schedule:
+          </p>
+          <div className="grid grid-cols-1 gap-x-4 gap-y-0.5 text-[0.95em] min-[480px]:grid-cols-3">
+            {allocateInstallments(inv.total, inv.installments, inv.amountPaid).map((r, i) => (
+              <p key={i} className="flex items-baseline gap-1">
+                <span style={{ color: YEL }}>♦</span>
+                <span>
+                  <b>{r.label}</b> ({r.percent}%) {money(r.amount)} · by {fmtDate(r.dueDate)}{" "}
+                  <b style={{ color: r.status === "paid" ? "#1d7a43" : r.status === "overdue" ? RED : GOLD }}>{r.status === "paid" ? "✓ Paid" : r.status === "partial" ? `Paid ${money(r.paid)}` : r.status === "overdue" ? "Overdue" : "Due"}</b>
+                </span>
+              </p>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Remarks */}
+      <div className="flex items-start gap-1.5 border-t-[1.5px] px-3 py-1.5 sm:px-5" style={{ borderColor: RED }}>
+        <span className="shrink-0 pt-px font-bold" style={{ color: RED }}>
+          Remarks:
+        </span>
+        {inv.remarks?.trim() ? (
+          <p className="min-w-0 flex-1 whitespace-pre-line break-words border-b-[1.5px] border-dotted pb-px font-semibold" style={{ borderColor: DOT }}>
+            {inv.remarks.trim()}
+          </p>
+        ) : (
+          <span className="mt-[1.1em] min-w-0 flex-1 border-b-[1.5px] border-dotted" style={{ borderColor: DOT }} />
+        )}
       </div>
 
       {/* Policies */}
@@ -232,7 +289,7 @@ export function ClassicInvoice({ inv, company, settings, className = "" }: { inv
           <ul className="mt-0.5 space-y-px">
             {cancel.map((l) => (
               <li key={l} className="flex gap-1">
-                <span style={{ color: RED }}>♦</span>
+                <span style={{ color: YEL }}>♦</span>
                 <span>{l}</span>
               </li>
             ))}
@@ -252,13 +309,18 @@ export function ClassicInvoice({ inv, company, settings, className = "" }: { inv
           <p className="font-bold underline" style={{ color: RED }}>
             Payment Terms:
           </p>
-          <ol className="mt-0.5 space-y-px">
-            {terms.map((l, i) => (
-              <li key={l}>
-                {i + 1}. {l}
-              </li>
-            ))}
-          </ol>
+          <div className="flex items-start gap-3">
+            <ol className="mt-0.5 min-w-0 flex-1 space-y-px">
+              {terms.map((l, i) => (
+                <li key={l}>
+                  {i + 1}. {l}
+                </li>
+              ))}
+            </ol>
+            {inv.status !== "draft" && inv.status !== "cancelled" && (
+              <PayQr settings={{ ...settings, companyName: company.name }} amount={inv.balance} invoiceNumber={inv.number} size={84} accent={RED} hideUpi={!!settings.upiId} />
+            )}
+          </div>
           {(settings.upiId || settings.bankDetails) && inv.balance > 0 && (
             <p className="mt-1 whitespace-pre-line text-[#444]">
               {settings.upiId && <b>UPI: {settings.upiId}</b>}
@@ -289,7 +351,8 @@ export function ClassicInvoice({ inv, company, settings, className = "" }: { inv
           </p>
         </div>
       </div>
-      <div className="py-1.5 text-center text-[10.5px] font-bold text-white sm:text-[13px]" style={{ background: RED }}>
+      <PartnerLogos settings={settings} className="border-t border-dashed border-[#E7B92E]" />
+      <div className="py-1.5 text-center text-[10.5px] font-bold text-white sm:text-[13px]" style={{ background: RED, borderTop: `3px solid ${YEL}` }}>
         {settings.footerNote ?? INVOICE_DEFAULTS.footerNote}
       </div>
     </article>

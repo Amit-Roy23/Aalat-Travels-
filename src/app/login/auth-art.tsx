@@ -1,4 +1,4 @@
-import { LogoMark } from "@/components/logo";
+import { LogoMark, LogoSeal } from "@/components/logo";
 
 /** Decorative brand panel with a dotted flight route, used on the login & setup pages. */
 export function AuthArt() {
@@ -33,6 +33,7 @@ export function AuthArt() {
         </g>
       </svg>
       <div className="relative mt-auto max-w-md">
+        <LogoSeal className="mb-7 h-32 w-32 shadow-[0_18px_50px_-12px_rgba(248,192,11,0.45)] ring-4 ring-white/10" />
         <p className="font-display text-[34px] font-extrabold leading-[1.1] tracking-tight">
           Every enquiry, every follow-up, <span className="text-hl">every journey</span> — in one place.
         </p>

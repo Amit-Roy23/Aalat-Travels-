@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { body, escapeRegex, HttpError, oid, paging, requireUser, route, searchParams } from "@/lib/api";
 import type { Types } from "mongoose";
-import { Customer, Invoice, Lead } from "@/lib/models";
+import { Customer, Invoice, Itinerary, Lead } from "@/lib/models";
 import { canAccessLead, convertLead } from "@/lib/services/leads";
 import { InvoiceInput } from "@/lib/validators";
 import { cleanTour, computeTotals, nextInvoiceNumber, recalc, refreshOverdue, shareToken } from "@/lib/services/invoices";
@@ -66,6 +66,8 @@ export const POST = route(async (req) => {
     tripTitle: data.tripTitle || data.tour?.name || "",
     tour: cleanTour(data.tour),
     taxType: data.taxType ?? s.invoice?.taxType ?? "cgst_sgst",
+    remarks: data.remarks ?? "",
+    installments: data.installments ?? [],
     issueDate: data.issueDate,
     dueDate: data.dueDate,
     ...totals,
@@ -78,6 +80,7 @@ export const POST = route(async (req) => {
   });
   recalc(inv);
   await inv.save();
+  if (data.itinerary) await Itinerary.updateOne({ _id: oid(data.itinerary) }, { $set: { invoice: inv._id, status: "confirmed", customer: customer._id } });
   await logActivity({ customer: customer._id, lead: inv.lead, type: "invoice", message: `${data.state === "draft" ? "Draft invoice" : "Invoice"} ${inv.number} created · ${money(inv.total)}`, user: user._id });
   return { invoice: inv };
 });

@@ -2,12 +2,15 @@
 import { use, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Ban, Copy, Printer, IndianRupee, MessageCircle, Pencil, Send, Trash2, X } from "lucide-react";
+import { ArrowLeft, Ban, Briefcase, Copy, Printer, IndianRupee, MessageCircle, Pencil, Send, Trash2, X } from "lucide-react";
 import { api, useApi } from "@/lib/client";
 import { fmtDate, money, toDateInput, waLink } from "@/lib/format";
 import { PAYMENT_METHODS, paymentMethodLabel } from "@/lib/constants";
 import { Button, Card, ErrorState, Field, InvoiceStatusBadge, Modal, PageLoader, useUi } from "@/components/ui";
 import { InvoiceDocument, type CompanyData, type InvoiceDocData } from "@/components/invoice-doc";
+import { InstallmentsTable } from "@/components/installments-view";
+import { usePayQr, type QrSettings } from "@/components/pay-qr";
+import { allocateInstallments } from "@/lib/installments";
 import { ClassicInvoice, type ClassicSettings } from "@/components/invoice-classic";
 import { useMe } from "@/components/session";
 
@@ -25,6 +28,14 @@ export default function InvoicePage({ params }: { params: Promise<{ id: string }
   const { id } = use(params);
   const me = useMe();
   const router = useRouter();
+  const openOps = async () => {
+    try {
+      const r = await api<{ tour: { _id: string }; existed?: boolean }>("/api/tours", { body: { fromInvoice: id } });
+      router.push(`/operations/${r.tour._id}`);
+    } catch (e) {
+      toast((e as Error).message, "error");
+    }
+  };
   const { toast, confirm } = useUi();
   const { data, error, mutate } = useApi<Res>(`/api/invoices/${id}`);
   const [pay, setPay] = useState(false);
@@ -118,6 +129,11 @@ export default function InvoicePage({ params }: { params: Promise<{ id: string }
               </Button>
             </>
           )}
+          {me.user.role === "admin" && inv.state !== "cancelled" && (
+            <Button size="sm" variant="outline" icon={<Briefcase className="h-4 w-4" />} onClick={openOps} title="Track hotel, car, staff and expense costs for this tour">
+              Operation file
+            </Button>
+          )}
           {inv.state !== "cancelled" && (
             <Link href={`/invoices/${id}/edit`}>
               <Button size="sm" variant="outline" icon={<Pencil className="h-4 w-4" />}>
@@ -159,6 +175,14 @@ export default function InvoicePage({ params }: { params: Promise<{ id: string }
           {template === "classic" ? <ClassicInvoice inv={inv} company={data.company} settings={data.invoiceSettings} /> : <InvoiceDocument inv={inv} company={data.company} bank={data.invoiceSettings} />}
         </div>
         <div className="no-print space-y-4">
+          {!!inv.installments?.length && (
+            <Card title="Part payments" padded={false}>
+              <InstallmentsTable total={inv.total} installments={inv.installments} amountPaid={inv.amountPaid} />
+            </Card>
+          )}
+          {inv.balance > 0 && inv.state === "issued" && (
+            <ScanPayCard settings={{ ...data.invoiceSettings, companyName: data.company.name }} amount={inv.balance} invoiceNumber={inv.number} />
+          )}
           <Card title="Payment status">
             <div className="mb-3 h-2.5 overflow-hidden rounded-full bg-surface-2">
               <div className="h-full rounded-full bg-leaf transition-all" style={{ width: `${inv.total ? Math.min(100, (inv.amountPaid / inv.total) * 100) : 0}%` }} />
@@ -200,12 +224,45 @@ export default function InvoicePage({ params }: { params: Promise<{ id: string }
           </Card>
         </div>
       </div>
-      <PaymentModal open={pay} onClose={() => setPay(false)} invoiceId={id} balance={inv.balance} onSaved={() => mutate()} />
+      <PaymentModal open={pay} onClose={() => setPay(false)} invoiceId={id} balance={inv.balance} onSaved={() => mutate()} suggestions={paymentSuggestions(inv)} />
     </div>
   );
 }
 
-function PaymentModal({ open, onClose, invoiceId, balance, onSaved }: { open: boolean; onClose: () => void; invoiceId: string; balance: number; onSaved: () => void }) {
+/** Quick amounts for the payment form: the next unpaid part payment(s), then the full balance. */
+function paymentSuggestions(inv: { total: number; amountPaid: number; balance: number; installments?: { label: string; percent: number; dueDate: string }[] }) {
+  const out: { label: string; amount: number }[] = [];
+  if (inv.installments?.length) {
+    const rows = allocateInstallments(inv.total, inv.installments, inv.amountPaid).filter((r) => r.remaining > 0);
+    let running = 0;
+    rows.slice(0, 2).forEach((r) => {
+      running += r.remaining;
+      out.push({ label: `${r.label} ${money(r.remaining)}`, amount: Math.round(running * 100) / 100 });
+    });
+    if (out.length === 2) out[1].label = `Up to ${rows[1].label} ${money(out[1].amount)}`;
+  }
+  out.push({ label: `Full balance ${money(inv.balance)}`, amount: inv.balance });
+  return out.filter((o, i, a) => a.findIndex((x) => Math.abs(x.amount - o.amount) < 0.005) === i);
+}
+
+function ScanPayCard({ settings, amount, invoiceNumber }: { settings: QrSettings; amount: number; invoiceNumber: string }) {
+  const { src } = usePayQr(settings, amount, invoiceNumber);
+  if (!src) return null;
+  return (
+    <Card title="Scan & Pay">
+      <div className="flex items-center gap-4">
+        <img src={src} alt="Payment QR" className="h-28 w-28 rounded-lg bg-white p-1 ring-1 ring-line" />
+        <div className="text-sm">
+          <p className="font-semibold">Show this to the customer</p>
+          <p className="text-muted">{settings.paymentQr ? "Your uploaded payment QR." : `UPI QR for ${money(amount)} (balance due).`}</p>
+          {settings.upiId && <p className="mt-1 font-mono text-xs">{settings.upiId}</p>}
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+function PaymentModal({ open, onClose, invoiceId, balance, onSaved, suggestions }: { open: boolean; onClose: () => void; invoiceId: string; balance: number; onSaved: () => void; suggestions: { label: string; amount: number }[] }) {
   const { toast } = useUi();
   const [f, setF] = useState({ amount: "", date: toDateInput(new Date()), method: "upi", reference: "", note: "" });
   const [err, setErr] = useState("");
@@ -233,11 +290,13 @@ function PaymentModal({ open, onClose, invoiceId, balance, onSaved }: { open: bo
       {err && <p className="mb-3 rounded-xl bg-coral-soft px-3 py-2 text-sm font-medium text-coral">{err}</p>}
       <div className="space-y-3">
         <Field label="Amount (₹)" required>
-          <div className="flex gap-2">
-            <input className="input" type="number" min={0} step="0.01" value={f.amount} onChange={(e) => setF({ ...f, amount: e.target.value })} autoFocus />
-            <Button variant="outline" size="sm" className="h-10" onClick={() => setF({ ...f, amount: String(balance) })}>
-              Full
-            </Button>
+          <input className="input" type="number" min={0} step="0.01" value={f.amount} onChange={(e) => setF({ ...f, amount: e.target.value })} autoFocus />
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {suggestions.map((sg) => (
+              <button key={sg.label} type="button" onClick={() => setF({ ...f, amount: String(sg.amount) })} className={`chip ${Number(f.amount) === sg.amount ? "bg-brand text-white" : "bg-surface-2 text-ink/80 hover:bg-line"}`}>
+                {sg.label}
+              </button>
+            ))}
           </div>
         </Field>
         <div className="grid grid-cols-2 gap-3">

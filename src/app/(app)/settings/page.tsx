@@ -1,15 +1,16 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Bot, Building2, CheckCircle2, CircleDashed, Copy, Database, FileText, KeyRound, Plug, Plus, RefreshCw, Save, Trash2, Sparkles } from "lucide-react";
+import { ArrowDown, ArrowUp, Bot, Building2, CheckCircle2, CircleDashed, Copy, Database, FileText, KeyRound, Plug, Plus, RefreshCw, Save, Trash2, Sparkles } from "lucide-react";
 import { api, useApi } from "@/lib/client";
 import { cn } from "@/lib/format";
 import { Badge, Button, Card, ErrorState, Field, PageHeader, PageLoader, Tabs, useUi } from "@/components/ui";
 import { useMe } from "@/components/session";
+import { usePayQr, type QrSettings } from "@/components/pay-qr";
 
 type Pkg = { name: string; destination: string; keywords: string[]; duration: string; pricePerPerson: number; inclusions: string; highlights: string; bestTime: string };
 type S = {
   company: Record<string, string>;
-  invoice: { template: "classic" | "modern"; numberStyle: "plain" | "prefixed"; startNumber: number; taxType: "cgst_sgst" | "igst"; cancellationPolicy: string; childPolicy: string; paymentTerms: string; refundNote: string; footerNote: string; prefix: string; defaultTaxRate: number; dueDays: number; terms: string; bankDetails: string; upiId: string };
+  invoice: { paymentQr: string; showPaymentQr: boolean; autoUpiQr: boolean; showPartnerLogos: boolean; partnerTitle: string; partnerLogos: { name: string; src: string }[]; template: "classic" | "modern"; numberStyle: "plain" | "prefixed"; startNumber: number; taxType: "cgst_sgst" | "igst"; cancellationPolicy: string; childPolicy: string; paymentTerms: string; refundNote: string; footerNote: string; prefix: string; defaultTaxRate: number; dueDays: number; terms: string; bankDetails: string; upiId: string };
   ai: { enabled: boolean; model: string; assistantName: string; tone: string; about: string; services: string; policies: string; officeHours: string; autoCreateLead: boolean; autoFollowUp: boolean; autoStatus: boolean; packages: Pkg[]; faqs: { question: string; answer: string }[] };
   leads: { autoAssign: "none" | "round_robin"; captureApiKey?: string };
 };
@@ -105,6 +106,7 @@ export default function SettingsPage() {
                   ["website", "Website"],
                   ["gstin", "GST IN"],
                   ["regNo", "Registration No."],
+                  ["msmeNo", "MSME (Udyam) No."],
                 ] as const
               ).map(([k, l]) => (
                 <Field key={k} label={l}>
@@ -114,9 +116,9 @@ export default function SettingsPage() {
               <Field label="Corporate office address" className="sm:col-span-2">
                 <textarea className="input" rows={2} value={s.company.address ?? ""} onChange={(e) => set("company", { address: e.target.value })} />
               </Field>
-              <Field label="Logo (printed on invoices)" className="sm:col-span-2" hint="PNG / JPG / WebP. It is resized automatically. Without a logo, a round emblem with the company name is used.">
+              <Field label="Logo (printed on invoices)" className="sm:col-span-2" hint="The official Aalat seal is used by default. Upload a PNG / JPG / WebP only to replace it (resized automatically).">
                 <div className="flex items-center gap-3">
-                  {s.company.logo ? <img src={s.company.logo} alt="Logo" className="h-16 w-16 rounded-full border border-line bg-white object-contain" /> : <span className="flex h-16 w-16 items-center justify-center rounded-full border border-dashed border-line text-[10px] text-muted">No logo</span>}
+                  <img src={s.company.logo || "/brand/aalat-seal.png"} alt="Logo" className="h-16 w-16 rounded-full border border-line bg-white object-contain" />
                   <label className="cursor-pointer rounded-xl border border-line px-3 py-2 text-sm font-semibold hover:bg-surface-2">
                     Upload
                     <input type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" onChange={async (e) => {
@@ -191,6 +193,122 @@ export default function SettingsPage() {
               <Field label="Terms (Modern format)" className="sm:col-span-3">
                 <textarea className="input" rows={3} value={s.invoice.terms} onChange={(e) => set("invoice", { terms: e.target.value })} />
               </Field>
+            </div>
+          </Card>
+          <Card title="Payment QR on the bill (Scan & Pay)">
+            <div className="grid gap-4 sm:grid-cols-[auto_1fr]">
+              <div className="flex flex-col items-center gap-2">
+                <QrPreview settings={{ ...s.invoice, upiId: s.invoice.upiId, companyName: s.company.name }} />
+                {!ro && (
+                  <div className="flex gap-2">
+                    <label className="cursor-pointer rounded-xl border border-line px-3 py-1.5 text-xs font-semibold hover:bg-surface-2">
+                      {s.invoice.paymentQr ? "Replace QR" : "Upload QR"}
+                      <input
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp"
+                        className="sr-only"
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          e.target.value = "";
+                          if (!file) return;
+                          try {
+                            set("invoice", { paymentQr: await resizeImage(file, 700) });
+                          } catch {
+                            toast("Could not read that image", "error");
+                          }
+                        }}
+                      />
+                    </label>
+                    {s.invoice.paymentQr && (
+                      <Button type="button" variant="ghost" size="sm" onClick={() => set("invoice", { paymentQr: "" })}>
+                        Remove
+                      </Button>
+                    )}
+                  </div>
+                )}
+              </div>
+              <div className="space-y-3">
+                <p className="text-sm text-muted">Upload the QR from your bank or UPI app (PhonePe / Google Pay / Paytm business QR). It is printed on every bill that has a balance due, shown on the invoice page and on the customer&apos;s invoice link.</p>
+                <Toggle label="Show the QR on bills" checked={s.invoice.showPaymentQr !== false} onChange={(v) => set("invoice", { showPaymentQr: v })} />
+                <Toggle
+                  label="No QR uploaded? Generate a UPI QR automatically"
+                  desc={s.invoice.upiId ? `Uses UPI ID ${s.invoice.upiId} with the exact balance due filled in.` : "Add your UPI ID in “Tax, payment & bank details” above to use this."}
+                  checked={s.invoice.autoUpiQr !== false}
+                  onChange={(v) => set("invoice", { autoUpiQr: v })}
+                />
+              </div>
+            </div>
+          </Card>
+          <Card
+            title="Logos at the bottom of the bill"
+            action={
+              !ro && (
+                <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-line px-3 py-1.5 text-xs font-semibold hover:bg-surface-2">
+                  <Plus className="h-3.5 w-3.5" /> Add logo
+                  <input
+                    type="file"
+                    multiple
+                    accept="image/png,image/jpeg,image/webp"
+                    className="sr-only"
+                    onChange={async (e) => {
+                      const files = Array.from(e.target.files ?? []);
+                      e.target.value = "";
+                      const added: { name: string; src: string }[] = [];
+                      for (const file of files) {
+                        try {
+                          added.push({ name: file.name.replace(/\.[^.]+$/, "").replace(/[-_]+/g, " "), src: await resizeImage(file, 360) });
+                        } catch {
+                          toast(`Could not read ${file.name}`, "error");
+                        }
+                      }
+                      const all = [...(s.invoice.partnerLogos ?? []), ...added];
+                      if (all.length > 12) toast("Up to 12 logos can be shown — extra ones were skipped", "info");
+                      set("invoice", { partnerLogos: all.slice(0, 12) });
+                    }}
+                  />
+                </label>
+              )
+            }
+          >
+            <div className="space-y-3">
+              <Toggle label="Show logos on invoices" desc="Printed in a row above the footer line, on both invoice formats and the customer share link." checked={s.invoice.showPartnerLogos !== false} onChange={(v) => set("invoice", { showPartnerLogos: v })} />
+              <Field label="Heading above the logos (optional)" hint="Leave empty to show the logos without a heading">
+                <input className="input" value={s.invoice.partnerTitle ?? ""} maxLength={80} onChange={(e) => set("invoice", { partnerTitle: e.target.value })} placeholder="e.g. Our tour destinations" />
+              </Field>
+              {(s.invoice.partnerLogos ?? []).length === 0 ? (
+                <p className="rounded-xl border border-dashed border-line p-4 text-center text-sm text-muted">No logos added.</p>
+              ) : (
+                <ul className="divide-y divide-line rounded-xl border border-line">
+                  {s.invoice.partnerLogos.map((l, i, arr) => {
+                    const move = (to: number) => {
+                      const next = [...arr];
+                      [next[i], next[to]] = [next[to], next[i]];
+                      set("invoice", { partnerLogos: next });
+                    };
+                    return (
+                      <li key={i} className="flex items-center gap-3 p-2.5">
+                        <span className="flex h-12 w-20 shrink-0 items-center justify-center rounded-lg bg-white p-1 ring-1 ring-line">
+                          <img src={l.src} alt={l.name} className="max-h-full max-w-full object-contain" />
+                        </span>
+                        <input className="input h-9 min-w-0 flex-1" value={l.name} aria-label="Logo name" onChange={(e) => set("invoice", { partnerLogos: arr.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)) })} />
+                        {!ro && (
+                          <div className="flex shrink-0 items-center">
+                            <button type="button" disabled={i === 0} onClick={() => move(i - 1)} className="rounded-lg p-1.5 text-muted hover:bg-surface-2 disabled:opacity-30" aria-label="Move left">
+                              <ArrowUp className="h-4 w-4" />
+                            </button>
+                            <button type="button" disabled={i === arr.length - 1} onClick={() => move(i + 1)} className="rounded-lg p-1.5 text-muted hover:bg-surface-2 disabled:opacity-30" aria-label="Move right">
+                              <ArrowDown className="h-4 w-4" />
+                            </button>
+                            <button type="button" onClick={() => set("invoice", { partnerLogos: arr.filter((_, j) => j !== i) })} className="rounded-lg p-1.5 text-muted hover:bg-coral-soft hover:text-coral" aria-label={`Remove ${l.name}`}>
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
             </div>
           </Card>
           <Card title="Policies printed on the Aalat Travels invoice">
@@ -449,4 +567,16 @@ function resizeImage(file: File, max: number): Promise<string> {
     };
     img.src = url;
   });
+}
+
+function QrPreview({ settings }: { settings: QrSettings }) {
+  const { src, auto } = usePayQr(settings, 1000, "PREVIEW");
+  if (!src)
+    return <span className="flex h-36 w-36 items-center justify-center rounded-xl border border-dashed border-line p-3 text-center text-xs text-muted">No QR yet — upload one or add a UPI ID</span>;
+  return (
+    <div className="text-center">
+      <img src={src} alt="Payment QR preview" className="h-36 w-36 rounded-xl bg-white object-contain p-1 ring-1 ring-line" />
+      <p className="mt-1 text-[11px] text-muted">{auto ? "Auto UPI QR (sample ₹1,000)" : "Uploaded QR"}</p>
+    </div>
+  );
 }

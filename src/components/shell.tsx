@@ -22,6 +22,9 @@ import {
   X,
   KeyRound,
   Sparkles,
+  Route,
+  Briefcase,
+  Clock3,
 } from "lucide-react";
 import { api, useApi } from "@/lib/client";
 import { cn, displayPhone, money, timeAgo } from "@/lib/format";
@@ -32,17 +35,21 @@ import { useMe } from "./session";
 import { LeadFormModal, FollowUpFormModal } from "./forms";
 
 const NAV = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/leads", label: "Leads", icon: Target },
-  { href: "/customers", label: "Customers", icon: Contact },
-  { href: "/follow-ups", label: "Follow-ups", icon: CalendarClock },
-  { href: "/inbox", label: "WhatsApp Inbox", icon: MessageCircle, badge: "inbox" as const },
-  { href: "/ai-demo", label: "AI Chat Demos", icon: Bot },
-  { href: "/invoices", label: "Invoices", icon: ReceiptText },
-  { href: "/reports", label: "Reports", icon: BarChart3, admin: true },
-  { href: "/team", label: "Team", icon: UsersRound, admin: true },
-  { href: "/settings", label: "Settings", icon: Settings },
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, group: "Sales" },
+  { href: "/leads", label: "Leads", icon: Target, group: "Sales" },
+  { href: "/customers", label: "Customers", icon: Contact, group: "Sales" },
+  { href: "/follow-ups", label: "Follow-ups", icon: CalendarClock, group: "Sales" },
+  { href: "/inbox", label: "WhatsApp Inbox", icon: MessageCircle, badge: "inbox" as const, group: "Sales" },
+  { href: "/ai-demo", label: "AI Chat Demos", icon: Bot, group: "Sales" },
+  { href: "/invoices", label: "Invoices", icon: ReceiptText, group: "Sales" },
+  { href: "/itineraries", label: "Itineraries", icon: Route, group: "Tours" },
+  { href: "/operations", label: "Operations", icon: Briefcase, admin: true, group: "Tours" },
+  { href: "/staff", label: "Staff & Payroll", agentLabel: "My Attendance", icon: Clock3, group: "Office" },
+  { href: "/reports", label: "Reports", icon: BarChart3, admin: true, group: "Office" },
+  { href: "/team", label: "Team", icon: UsersRound, admin: true, group: "Office" },
+  { href: "/settings", label: "Settings", icon: Settings, group: "Office" },
 ];
+const GROUP_LABEL: Record<string, string> = { Sales: "Sales & CRM", Tours: "Tours & operations", Office: "Office" };
 
 type Notif = { items: { _id: string; title: string; body: string; link: string; read: boolean; createdAt: string; type: string }[]; unread: number; reminders: { _id: string; title: string; dueAt: string; lead?: { name: string }; customer?: { name: string } }[] };
 
@@ -57,23 +64,27 @@ export function AppShell({ children }: { children: ReactNode }) {
   const isActive = (href: string) => pathname === href || pathname.startsWith(href + "/");
   const NavLinks = ({ onDark }: { onDark?: boolean }) => (
     <nav className="space-y-0.5">
-      {nav.map((n) => {
+      {nav.map((n, i) => {
         const active = isActive(n.href);
         const count = n.badge === "inbox" ? (inbox?.counts.unread ?? 0) : 0;
+        const heading = i === 0 || nav[i - 1].group !== n.group;
         return (
+          <div key={n.href}>
+          {heading && <p className={cn("px-3 pb-1 text-[10.5px] font-bold uppercase tracking-[0.14em]", i === 0 ? "pt-0" : "pt-4", onDark ? "text-white/35" : "text-muted")}>{GROUP_LABEL[n.group]}</p>}
           <Link
             key={n.href}
             href={n.href}
             className={cn(
-              "group flex items-center gap-3 rounded-xl px-3 py-2.5 text-[14px] font-semibold transition",
+              "group flex items-center gap-3 rounded-xl px-3 py-2 text-[14px] font-semibold transition",
               onDark ? (active ? "bg-gradient-to-r from-brand to-brand/70 text-white shadow-[0_8px_20px_-10px_rgb(var(--brand))]" : "text-white/65 hover:bg-white/[0.06] hover:text-white") : active ? "bg-brand-soft text-brand-ink" : "text-ink/70 hover:bg-surface-2",
             )}
           >
             <n.icon className={cn("h-[18px] w-[18px]", !active && onDark && "text-white/55 group-hover:text-white")} />
-            <span className="flex-1">{n.label}</span>
+            <span className="flex-1">{me.user.role !== "admin" && n.agentLabel ? n.agentLabel : n.label}</span>
             {n.href === "/ai-demo" && <Sparkles className="h-3.5 w-3.5 text-accent" />}
             {count > 0 && <span className="rounded-full bg-[#25D366] px-1.5 py-px text-[11px] font-bold text-[#073B2F]">{count}</span>}
           </Link>
+          </div>
         );
       })}
     </nav>
@@ -326,7 +337,7 @@ function Notifications() {
       seen.current.add(i.id);
       if (perm === "granted") {
         try {
-          const n = new Notification(i.title, { body: i.body, icon: "/icon.svg", tag: i.id });
+          const n = new Notification(i.title, { body: i.body, icon: "/brand/favicon-64.png", tag: i.id });
           n.onclick = () => {
             window.focus();
             if (i.link) router.push(i.link);

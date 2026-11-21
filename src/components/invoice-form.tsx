@@ -7,6 +7,7 @@ import { money, round2, toDateInput } from "@/lib/format";
 import { Button, Card, Field, useUi } from "./ui";
 import { CustomerFormModal, EntityPicker } from "./forms";
 import { FOOD_PLANS, PROPERTY_TYPES, VEHICLE_TYPES } from "@/lib/invoice-defaults";
+import { defaultSchedule, installmentAmounts, percentTotal } from "@/lib/installments";
 
 type Item = { description: string; quantity: string; rate: string };
 export type InvoiceInit = {
@@ -25,6 +26,8 @@ export type InvoiceInit = {
   state?: string;
   amountPaid?: number;
   taxType?: string;
+  remarks?: string;
+  installments?: { label: string; percent: number; dueDate: string }[];
   tour?: { name?: string; duration?: string; adults?: number; children?: number; rooms?: number; startDate?: string; endDate?: string; startPoint?: string; endPoint?: string; foodPlan?: string; propertyType?: string; vehicleSeat?: string; vehicleType?: string };
 };
 
@@ -34,13 +37,61 @@ type CustLeads = { leads: { _id: string; destination: string; travelDate: string
 
 type SettingsRes = { settings: { invoice: { defaultTaxRate: number; dueDays: number; terms: string; taxType: string }; ai: { packages: { name: string; duration: string; pricePerPerson: number }[] } } };
 
-export function InvoiceForm({ init, presetCustomer }: { init?: InvoiceInit; presetCustomer?: { id: string; name: string; phone?: string } | null }) {
+export type ItinerarySource = {
+  _id: string;
+  title: string;
+  destination?: string;
+  startDate?: string;
+  adults: number;
+  children: number;
+  startPoint?: string;
+  endPoint?: string;
+  days: { stay?: string; meals?: { breakfast?: boolean; lunch?: boolean; dinner?: boolean } }[];
+  pricePerAdult: number;
+  pricePerChild: number;
+  customer?: { _id: string; name: string; phone?: string } | null;
+  lead?: { _id: string; name: string; phone?: string } | null;
+};
+
+/** Pre-fills a new invoice from an itinerary: guest, tour details and per-adult / per-child lines. */
+function fromItineraryInit(it: ItinerarySource): InvoiceInit {
+  const n = it.days.length;
+  const meals = it.days.slice(0, -1);
+  const allB = meals.length > 0 && meals.every((d) => d.meals?.breakfast);
+  const allD = meals.length > 0 && meals.every((d) => d.meals?.dinner);
+  const allL = meals.length > 0 && meals.every((d) => d.meals?.lunch);
+  const plan = allB && allL && allD ? "AP (All meals)" : allB && allD ? "MAP (Breakfast + Dinner)" : allB ? "CP (Breakfast)" : "";
+  const start = it.startDate ? new Date(it.startDate) : null;
+  return {
+    tripTitle: it.title,
+    tour: {
+      name: it.title,
+      duration: n > 1 ? `${n - 1} Nights / ${n} Days` : n === 1 ? "1 Day" : "",
+      adults: it.adults,
+      children: it.children,
+      rooms: it.adults ? Math.max(1, Math.ceil(it.adults / 2)) : 0,
+      startDate: it.startDate,
+      endDate: start && n > 0 ? new Date(start.getTime() + (n - 1) * 86400000).toISOString() : undefined,
+      startPoint: it.startPoint,
+      endPoint: it.endPoint,
+      foodPlan: plan,
+    },
+    items: [
+      ...(it.adults && it.pricePerAdult ? [{ description: `${it.title} — per adult`, quantity: it.adults, rate: it.pricePerAdult }] : []),
+      ...(it.children && it.pricePerChild ? [{ description: `${it.title} — per child`, quantity: it.children, rate: it.pricePerChild }] : []),
+    ],
+  };
+}
+
+export function InvoiceForm({ init: initProp, presetCustomer, fromItinerary }: { init?: InvoiceInit; presetCustomer?: { id: string; name: string; phone?: string } | null; fromItinerary?: ItinerarySource }) {
+  const init: InvoiceInit | undefined = initProp ?? (fromItinerary ? fromItineraryInit(fromItinerary) : undefined);
+  const itGuest = fromItinerary?.customer ? { kind: "customer" as const, id: fromItinerary.customer._id, name: fromItinerary.customer.name, phone: fromItinerary.customer.phone } : fromItinerary?.lead ? { kind: "lead" as const, id: fromItinerary.lead._id, name: fromItinerary.lead.name, phone: fromItinerary.lead.phone } : null;
   const router = useRouter();
   const { toast } = useUi();
   const { data: st } = useApi<SettingsRes>("/api/settings", { revalidateOnFocus: false });
-  const editing = Boolean(init?._id);
+  const editing = Boolean(initProp?._id);
   const [customer, setCustomer] = useState<{ kind: "lead" | "customer"; id: string; name: string; phone?: string } | null>(
-    init?.customer ? { kind: "customer", id: init.customer._id, name: init.customer.name, phone: init.customer.phone } : presetCustomer ? { kind: "customer", ...presetCustomer } : null,
+    init?.customer ? { kind: "customer", id: init.customer._id, name: init.customer.name, phone: init.customer.phone } : presetCustomer ? { kind: "customer", ...presetCustomer } : itGuest,
   );
   const today = toDateInput(new Date());
   const [f, setF] = useState({
@@ -50,6 +101,7 @@ export function InvoiceForm({ init, presetCustomer }: { init?: InvoiceInit; pres
     discount: init?.discount ? String(init.discount) : "",
     taxRate: init?.taxRate !== undefined ? String(init.taxRate) : "",
     notes: init?.notes ?? "Thank you for choosing us! Have a wonderful journey.",
+    remarks: init?.remarks ?? "",
     terms: init?.terms ?? "",
   });
   const [items, setItems] = useState<Item[]>(init?.items?.map((i) => ({ description: i.description, quantity: String(i.quantity), rate: String(i.rate) })) ?? [{ description: "", quantity: "1", rate: "" }]);
@@ -74,12 +126,15 @@ export function InvoiceForm({ init, presetCustomer }: { init?: InvoiceInit; pres
       : blankTour,
   );
   const [taxType, setTaxType] = useState(init?.taxType ?? "");
+  const [schedule, setSchedule] = useState<{ label: string; percent: string; dueDate: string }[]>(
+    (init?.installments ?? []).map((i) => ({ label: i.label, percent: String(i.percent), dueDate: toDateInput(i.dueDate) })),
+  );
   const [leadId, setLeadId] = useState<string>(typeof init?.lead === "string" ? init.lead : (init?.lead?._id ?? ""));
   const { data: custData } = useApi<CustLeads>(!editing && customer?.kind === "customer" ? `/api/customers/${customer.id}` : null);
   const [newCust, setNewCust] = useState<string | null>(null);
   const setT = (k: keyof Tour) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setTour((p) => ({ ...p, [k]: e.target.value }));
   const [err, setErr] = useState("");
-  const [errField, setErrField] = useState<"" | "customer" | "items" | "dates" | "tour">("");
+  const [errField, setErrField] = useState<"" | "customer" | "items" | "dates" | "tour" | "schedule">("");
   const [busy, setBusy] = useState<"" | "draft" | "issued">("");
 
   /** Shows a validation/server error where the user can see it: next to the button, as a toast, and scrolls to the field. */
@@ -87,7 +142,7 @@ export function InvoiceForm({ init, presetCustomer }: { init?: InvoiceInit; pres
     setErr(msg);
     setErrField(field);
     toast(msg, "error");
-    const target = { customer: "inv-billto", items: "inv-items", dates: "inv-billto", tour: "inv-tour", "": "" }[field];
+    const target = { customer: "inv-billto", items: "inv-items", dates: "inv-billto", tour: "inv-tour", schedule: "inv-schedule", "": "" }[field];
     if (target) document.getElementById(target)?.scrollIntoView({ behavior: "smooth", block: "center" });
   };
 
@@ -167,6 +222,13 @@ export function InvoiceForm({ init, presetCustomer }: { init?: InvoiceInit; pres
     if (!f.issueDate || !f.dueDate) return fail("Choose the issue date and due date.", "dates");
     if (f.dueDate < f.issueDate) return fail("Due date cannot be before the issue date.", "dates");
     if (tour.startDate && tour.endDate && tour.endDate < tour.startDate) return fail("Tour ending date cannot be before the starting date.", "tour");
+    if (schedule.length) {
+      if (schedule.some((r) => !r.label.trim())) return fail("Give every part payment a name (e.g. Advance).", "schedule");
+      if (schedule.some((r) => !(Number(r.percent) > 0))) return fail("Every part payment needs a percentage.", "schedule");
+      if (Math.abs(percentTotal(schedule.map((r) => ({ percent: Number(r.percent) }))) - 100) > 0.01) return fail(`Part payments add up to ${percentTotal(schedule.map((r) => ({ percent: Number(r.percent) })))}% — they must total 100%.`, "schedule");
+      if (schedule.some((r) => !r.dueDate)) return fail("Choose a due date for every part payment.", "schedule");
+      if (schedule.some((r) => r.dueDate < f.issueDate)) return fail("Part payment dates cannot be before the issue date.", "schedule");
+    }
     if (editing && init?.amountPaid && totals.total < init.amountPaid) return fail(`Total cannot be less than the ${money(init.amountPaid)} already paid.`, "items");
     setBusy(state);
     try {
@@ -182,11 +244,13 @@ export function InvoiceForm({ init, presetCustomer }: { init?: InvoiceInit; pres
           endDate: tour.endDate || null,
         },
         issueDate: f.issueDate,
-        dueDate: f.dueDate,
+        dueDate: schedule.length ? schedule.reduce((m, r) => (r.dueDate > m ? r.dueDate : m), f.dueDate) : f.dueDate,
         items: clean.map((i) => ({ description: i.description.trim(), quantity: Number(i.quantity), rate: Number(i.rate) || 0 })),
         discount: Number(f.discount) || 0,
         taxRate: Number(f.taxRate) || 0,
         notes: f.notes,
+        remarks: f.remarks.trim(),
+        installments: schedule.map((r) => ({ label: r.label.trim(), percent: Number(r.percent), dueDate: r.dueDate })),
         terms: f.terms,
       };
       let id = init?._id;
@@ -194,7 +258,7 @@ export function InvoiceForm({ init, presetCustomer }: { init?: InvoiceInit; pres
         await api(`/api/invoices/${id}`, { method: "PATCH", body: { ...body, ...(init?.state === "draft" && state === "issued" ? { state: "issued" } : {}) } });
       } else {
         const r = await api<{ invoice: { _id: string } }>("/api/invoices", {
-          body: { ...body, customer: customer.kind === "customer" ? customer.id : undefined, lead: customer.kind === "lead" ? customer.id : leadId || undefined, state },
+          body: { ...body, customer: customer.kind === "customer" ? customer.id : undefined, lead: customer.kind === "lead" ? customer.id : leadId || undefined, itinerary: fromItinerary?._id, state },
         });
         id = r.invoice._id;
       }
@@ -347,6 +411,69 @@ export function InvoiceForm({ init, presetCustomer }: { init?: InvoiceInit; pres
           <Button variant="ghost" size="sm" className="mt-3" icon={<Plus className="h-4 w-4" />} onClick={() => setItems((a) => [...a, { description: "", quantity: "1", rate: "" }])}>
             Add line
           </Button>
+        </Card>
+        <span id="inv-schedule" className="block scroll-mt-24" />
+        <Card
+          title="Part payments"
+          className={errField === "schedule" ? "ring-2 ring-coral/40" : ""}
+          action={
+            schedule.length ? (
+              <Button type="button" variant="ghost" size="sm" onClick={() => setSchedule([])}>
+                Remove schedule
+              </Button>
+            ) : null
+          }
+        >
+          {schedule.length === 0 ? (
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm text-muted">Split the bill into part payments with due dates — each one is tracked as paid, partly paid or overdue.</p>
+              <div className="flex shrink-0 gap-2">
+                <Button type="button" variant="outline" size="sm" onClick={() => setSchedule(defaultSchedule(f.issueDate, tour.startDate).map((r) => ({ ...r, percent: String(r.percent) })))}>
+                  30% / 50% / 20%
+                </Button>
+                <Button type="button" variant="outline" size="sm" onClick={() => setSchedule([{ label: "Advance", percent: "50", dueDate: f.issueDate }, { label: "Balance", percent: "50", dueDate: f.dueDate || f.issueDate }])}>
+                  Custom split
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="space-y-2">
+                {(() => {
+                  const amounts = installmentAmounts(totals.total, schedule.map((r) => ({ percent: Number(r.percent) || 0 })));
+                  return schedule.map((r, i) => (
+                    <div key={i} className="grid grid-cols-[1fr_88px] gap-2 rounded-xl border border-line p-2.5 sm:grid-cols-[1fr_88px_150px_110px_36px] sm:items-center sm:border-0 sm:p-0">
+                      <input className="input" value={r.label} aria-label="Part payment name" placeholder="e.g. Advance" onChange={(e) => setSchedule((a) => a.map((x, j) => (j === i ? { ...x, label: e.target.value } : x)))} />
+                      <div className="relative">
+                        <input className="input pr-7 text-right" type="number" min={0} max={100} step="0.01" value={r.percent} aria-label="Percent" onChange={(e) => setSchedule((a) => a.map((x, j) => (j === i ? { ...x, percent: e.target.value } : x)))} />
+                        <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted">%</span>
+                      </div>
+                      <input className="input" type="date" min={f.issueDate} value={r.dueDate} aria-label="Due date" onChange={(e) => setSchedule((a) => a.map((x, j) => (j === i ? { ...x, dueDate: e.target.value } : x)))} />
+                      <p className="self-center text-sm font-semibold tabular-nums sm:text-right">{money(Number(r.percent) > 0 ? amounts[i] : 0)}</p>
+                      <button type="button" onClick={() => setSchedule((a) => a.filter((_, j) => j !== i))} className="justify-self-end rounded-lg p-2 text-muted hover:bg-coral-soft hover:text-coral" aria-label="Remove part payment">
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ));
+                })()}
+              </div>
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                <Button type="button" variant="ghost" size="sm" icon={<Plus className="h-4 w-4" />} disabled={schedule.length >= 8} onClick={() => setSchedule((a) => [...a, { label: `Part payment ${a.length + 1}`, percent: String(Math.max(0, Math.round((100 - percentTotal(a.map((x) => ({ percent: Number(x.percent) || 0 })))) * 100) / 100)), dueDate: f.dueDate || f.issueDate }])}>
+                  Add part payment
+                </Button>
+                {(() => {
+                  const pt = percentTotal(schedule.map((r) => ({ percent: Number(r.percent) || 0 })));
+                  return <span className={`text-sm font-semibold ${Math.abs(pt - 100) < 0.01 ? "text-leaf" : "text-coral"}`}>Total {pt}% {Math.abs(pt - 100) < 0.01 ? "✓" : "· must be 100%"}</span>;
+                })()}
+              </div>
+              <p className="mt-2 text-xs text-muted">Amounts follow the grand total automatically. The invoice due date becomes the last part payment&apos;s date.</p>
+            </>
+          )}
+        </Card>
+        <Card title="Remarks">
+          <Field label="Remarks (printed on the bill)" hint={`${f.remarks.length}/1000 · e.g. special requests, inclusions agreed on call, pickup details`}>
+            <textarea className="input" rows={3} maxLength={1000} value={f.remarks} onChange={(e) => setF({ ...f, remarks: e.target.value })} placeholder="e.g. Early check-in requested at Srinagar. Honeymoon cake & flower decoration included." />
+          </Field>
         </Card>
         <Card title="Notes & terms">
           <div className="grid gap-3.5">

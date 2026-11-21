@@ -1,4 +1,4 @@
-import { INVOICE_DEFAULTS } from "../invoice-defaults";
+import { DEFAULT_PARTNER_LOGOS, INVOICE_DEFAULTS } from "../invoice-defaults";
 import mongoose, { Schema, model, models, type InferSchemaType, type Model, Types } from "mongoose";
 import {
   ACTIVITY_TYPES,
@@ -213,6 +213,12 @@ const InvoiceSchema = new Schema(
       vehicleType: { type: String, default: "" },
     },
     taxType: { type: String, enum: ["cgst_sgst", "igst"], default: "cgst_sgst" },
+    remarks: { type: String, default: "" },
+    // Part-payment schedule: amounts are derived from percent × total (last instalment takes any rounding remainder)
+    installments: {
+      type: [new Schema({ label: { type: String, required: true }, percent: { type: Number, required: true, min: 0.01, max: 100 }, amount: { type: Number, default: 0 }, dueDate: { type: Date, required: true } }, { _id: true })],
+      default: [],
+    },
     issueDate: { type: Date, required: true },
     dueDate: { type: Date, required: true },
     items: { type: [InvoiceItemSchema], default: [] },
@@ -282,6 +288,7 @@ const SettingsSchema = new Schema(
       address: { type: String, default: "126, Feeder Road, Belgharia, Kolkata - 700056" },
       gstin: { type: String, default: "" },
       regNo: { type: String, default: "PM01592N2023000001" },
+      msmeNo: { type: String, default: "UDYAM-WB-10-0091056" }, // MSME / Udyam registration
       logo: { type: String, default: "" }, // small PNG data URL, uploaded in Settings
     },
     invoice: {
@@ -294,6 +301,16 @@ const SettingsSchema = new Schema(
       paymentTerms: { type: String, default: INVOICE_DEFAULTS.paymentTerms },
       refundNote: { type: String, default: INVOICE_DEFAULTS.refundNote },
       footerNote: { type: String, default: INVOICE_DEFAULTS.footerNote },
+      showPartnerLogos: { type: Boolean, default: true },
+      paymentQr: { type: String, default: "" }, // uploaded UPI / bank QR (data URL)
+      showPaymentQr: { type: Boolean, default: true },
+      autoUpiQr: { type: Boolean, default: true }, // generate a UPI QR for the amount due when no image is uploaded
+      partnerDefaultsVersion: { type: Number, default: 0 },
+      partnerTitle: { type: String, default: "" },
+      partnerLogos: {
+        type: [new Schema({ name: { type: String, default: "" }, src: { type: String, required: true } }, { _id: false })],
+        default: () => DEFAULT_PARTNER_LOGOS.map((l) => ({ ...l })),
+      },
       prefix: { type: String, default: "AAL" },
       defaultTaxRate: { type: Number, default: 5 },
       dueDays: { type: Number, default: 7 },
@@ -320,6 +337,12 @@ const SettingsSchema = new Schema(
       autoFollowUp: { type: Boolean, default: true },
       autoStatus: { type: Boolean, default: true },
     },
+    payroll: {
+      weeklyOff: { type: [Number], default: [0] }, // 0 = Sunday
+      officeStart: { type: String, default: "10:00" },
+      graceMinutes: { type: Number, default: 15, min: 0 },
+      unmarkedAs: { type: String, enum: ["absent", "present"], default: "absent" },
+    },
     leads: {
       autoAssign: { type: String, enum: ["none", "round_robin"], default: "round_robin" },
       lastAssignedIndex: { type: Number, default: -1 },
@@ -331,3 +354,5 @@ const SettingsSchema = new Schema(
 export const Settings = getModel("Settings", SettingsSchema);
 
 export { mongoose };
+
+export * from "./ops";

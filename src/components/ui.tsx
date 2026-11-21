@@ -1,5 +1,5 @@
 "use client";
-import { createContext, forwardRef, useCallback, useContext, useEffect, useRef, useState, type ButtonHTMLAttributes, type ReactNode } from "react";
+import { Children, cloneElement, createContext, forwardRef, isValidElement, useCallback, useContext, useEffect, useId, useRef, useState, type ButtonHTMLAttributes, type ReactElement, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, Info, Loader2, X } from "lucide-react";
 import { cn, initials } from "@/lib/format";
@@ -41,15 +41,24 @@ export const Button = forwardRef<HTMLButtonElement, BtnProps>(function Button({ 
 
 /* ───────── Field ───────── */
 export function Field({ label, hint, error, children, className, required }: { label?: string; hint?: ReactNode; error?: string; children: ReactNode; className?: string; required?: boolean }) {
+  const autoId = useId();
+  // Link the label to the first input / select / textarea inside, so clicking the label focuses it and screen readers announce it.
+  let fieldId: string | undefined;
+  const kids = Children.map(children, (c) => {
+    if (fieldId || !isValidElement(c) || !(c.type === "input" || c.type === "select" || c.type === "textarea")) return c;
+    const el = c as ReactElement<{ id?: string; "aria-invalid"?: boolean }>;
+    fieldId = el.props.id ?? autoId;
+    return cloneElement(el, { id: fieldId, ...(error ? { "aria-invalid": true } : {}) });
+  });
   return (
     <div className={className}>
       {label && (
-        <label className="label">
+        <label className="label" htmlFor={fieldId}>
           {label}
           {required && <span className="text-coral"> *</span>}
         </label>
       )}
-      {children}
+      {kids}
       {error ? <p className="mt-1 text-xs font-medium text-coral">{error}</p> : hint ? <p className="mt-1 text-xs text-muted">{hint}</p> : null}
     </div>
   );
