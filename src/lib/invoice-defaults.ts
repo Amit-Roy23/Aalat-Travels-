@@ -25,12 +25,16 @@ export const INVOICE_DEFAULTS = {
 
 /** Logos printed in a strip at the bottom of the bill (editable in Settings → Invoices). */
 export const DEFAULT_PARTNER_LOGOS = [
+  { name: "Incredible India", src: "/brand/partners/incredible-india.png" },
   { name: "J&K Tourism", src: "/brand/partners/jk-tourism.png" },
   { name: "Rajasthan Tourism", src: "/brand/partners/rajasthan-tourism.png" },
   { name: "Assam Tourism", src: "/brand/partners/assam-tourism.png" },
   { name: "West Bengal Tourism", src: "/brand/partners/bengal-tourism.png" },
   { name: "Gujarat Tourism", src: "/brand/partners/gujarat-tourism.png" },
+  { name: "Kerala Tourism", src: "/brand/partners/kerala-tourism.png" },
 ];
+/** Bumped whenever new default logos are bundled, so existing installations receive them once. */
+export const PARTNER_DEFAULTS_VERSION = 2;
 
 export const FOOD_PLANS = ["EP (Room only)", "CP (Breakfast)", "MAP (Breakfast + Dinner)", "AP (All meals)"];
 export const PROPERTY_TYPES = ["Hotel", "Resort", "Homestay", "Houseboat", "Cottage", "Camp / Tent", "Villa", "Hotel + Houseboat"];

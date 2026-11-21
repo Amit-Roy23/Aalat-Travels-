@@ -29,7 +29,13 @@ export function PartnerLogos({ settings, className = "" }: { settings: ClassicSe
       {settings.partnerTitle && <p className="mb-1.5 text-center text-[9px] font-bold uppercase tracking-[0.18em] text-[#6b6b6b] sm:text-[10px]">{settings.partnerTitle}</p>}
       <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 sm:justify-between sm:gap-x-4">
         {logos.map((l, i) => (
-          <img key={l.src.slice(-40) + i} src={l.src} alt={l.name} title={l.name} className="h-10 w-auto max-w-[130px] object-contain sm:h-[60px] sm:max-w-[175px]" />
+          <img
+            key={l.src.slice(-40) + i}
+            src={l.src}
+            alt={l.name}
+            title={l.name}
+            className={`w-auto object-contain ${logos.length > 6 ? "h-9 max-w-[120px] sm:h-[50px] sm:max-w-[150px]" : "h-10 max-w-[130px] sm:h-[60px] sm:max-w-[175px]"}`}
+          />
         ))}
       </div>
     </div>

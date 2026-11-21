@@ -296,6 +296,7 @@ const SettingsSchema = new Schema(
       refundNote: { type: String, default: INVOICE_DEFAULTS.refundNote },
       footerNote: { type: String, default: INVOICE_DEFAULTS.footerNote },
       showPartnerLogos: { type: Boolean, default: true },
+      partnerDefaultsVersion: { type: Number, default: 0 },
       partnerTitle: { type: String, default: "" },
       partnerLogos: {
         type: [new Schema({ name: { type: String, default: "" }, src: { type: String, required: true } }, { _id: false })],
