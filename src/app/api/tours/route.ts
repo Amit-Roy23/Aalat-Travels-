@@ -20,8 +20,9 @@ export const GET = route(async (req) => {
   const tours = await Tour.find(filter).sort({ startDate: -1 }).limit(300).populate("invoices", INV_FIELDS).lean();
   const items = tours.map((t) => {
     const invoices = (t.invoices ?? []) as unknown as { total: number; amountPaid: number; status: string }[];
-    const { hotels, cars, staff, expenses, ...head } = t;
-    return { ...head, counts: { hotels: hotels.length, cars: cars.length, staff: staff.length, expenses: expenses.length }, summary: tourSummary(t, invoices) };
+    const { hotels, cars, staff, expenses, bookings, activities: _a, ...head } = t;
+    void _a;
+    return { ...head, counts: { hotels: hotels.length, cars: cars.length, staff: staff.length, expenses: expenses.length, bookings: (bookings as { status: string }[]).filter((b) => b.status !== "cancelled").length }, summary: tourSummary(t, invoices) };
   });
   const live = items.filter((t) => t.status !== "cancelled");
   const billed = live.filter((t) => t.summary.revenue > 0);

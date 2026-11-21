@@ -3,6 +3,7 @@ import { Types } from "mongoose";
 import { InventoryItem, StockMovement, Tour } from "../models";
 import { HttpError } from "../api";
 import { round2 } from "../format";
+import { bookingTotals, type BookingLike } from "../bookings";
 import { EXPENSE_CATEGORIES } from "../constants";
 
 export const SECTIONS = ["hotels", "cars", "staff", "expenses"] as const;
@@ -18,7 +19,7 @@ export function withTotals<T extends Line>(l: T) {
   return { ...l, paid, due: round2(Math.max(l.amount - paid, 0)) };
 }
 
-type TourLike = { hotels?: Line[]; cars?: Line[]; staff?: Line[]; expenses?: Line[] };
+type TourLike = { hotels?: Line[]; cars?: Line[]; staff?: Line[]; expenses?: Line[]; bookings?: BookingLike[] };
 export function tourSummary(t: TourLike, invoices: { total: number; amountPaid: number; status?: string }[] = []) {
   const bucket = () => ({ amount: 0, paid: 0, due: 0, count: 0 });
   const sections = Object.fromEntries(SECTIONS.map((s) => [s, bucket()])) as Record<Section, ReturnType<typeof bucket>>;
@@ -43,8 +44,11 @@ export function tourSummary(t: TourLike, invoices: { total: number; amountPaid: 
   const cost = SECTIONS.reduce((x, s) => x + sections[s].amount, 0);
   const paid = SECTIONS.reduce((x, s) => x + sections[s].paid, 0);
   const valid = invoices.filter((i) => i.status !== "cancelled" && i.status !== "draft");
-  const revenue = round2(valid.reduce((x, i) => x + i.total, 0));
-  const collected = round2(valid.reduce((x, i) => x + i.amountPaid, 0));
+  const bk = bookingTotals(t.bookings ?? []);
+  const invoiceRevenue = round2(valid.reduce((x, i) => x + i.total, 0));
+  const invoiceCollected = round2(valid.reduce((x, i) => x + i.amountPaid, 0));
+  const revenue = round2(invoiceRevenue + bk.billed);
+  const collected = round2(invoiceCollected + bk.paid);
   return {
     sections: Object.fromEntries(SECTIONS.map((s) => [s, r(sections[s])])) as Record<Section, ReturnType<typeof r>>,
     categories: Object.fromEntries(Object.entries(categories).filter(([, b]) => b.count).map(([k, b]) => [k, r(b)])),
@@ -53,6 +57,10 @@ export function tourSummary(t: TourLike, invoices: { total: number; amountPaid: 
     due: round2(cost - paid),
     revenue,
     collected,
+    invoiceRevenue,
+    bookingRevenue: bk.billed,
+    guestDue: round2(revenue - collected),
+    pax: { adults: bk.adults, children: bk.children, bookings: bk.bookings },
     profit: round2(revenue - cost),
     margin: revenue ? round2(((revenue - cost) / revenue) * 100) : null,
   };

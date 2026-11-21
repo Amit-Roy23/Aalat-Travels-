@@ -230,6 +230,32 @@ check "used vendor is deactivated not deleted" $(req -X DELETE $B/api/vendors/$V
 OUT=$(req -d "{\"type\":\"out\",\"quantity\":5,\"tour\":\"$TID\",\"date\":\"$TODAY\"}" $B/api/inventory/$IT/movements | jq_ "d['movement']['_id']")
 check "deleting tour returns issued stock" $(req -X DELETE $B/api/tours/$TID >/dev/null; req $B/api/inventory/$IT | jq_ "'%g' % d['item']['stock']") 5
 req -X DELETE $B/api/staff/$SID2 >/dev/null
+echo "Guest bookings (group departure register)"
+GT=$(req -d "{\"name\":\"E2E Desert Group\",\"startDate\":\"$NEXT\",\"pax\":10}" $B/api/tours | jq_ "d['tour']['_id']")
+check "activity rates saved" $(req -X PUT -d '{"activities":[{"name":"Jeep safari","rate":700},{"name":"Camel ride","rate":200}]}' $B/api/tours/$GT/activities | jq_ "len(d['tour']['activities'])") 2
+check "duplicate activity names rejected" $(code -X PUT -d '{"activities":[{"name":"Jeep","rate":1},{"name":"jeep","rate":2}]}' $B/api/tours/$GT/activities) 400
+check "advance above package rejected" $(code -d "{\"guestName\":\"Over Pay\",\"amount\":1000,\"initial\":{\"package\":[{\"amount\":2000,\"date\":\"$TODAY\"}]}}" $B/api/tours/$GT/bookings) 400
+R=$(req -d "{\"guestName\":\"E2E Sourav\",\"phone\":\"98365 53074\",\"billNo\":\"1485\",\"adults\":3,\"children\":2,\"rooms\":2,\"amount\":90000,\"ticket\":{\"mode\":\"by_us\",\"details\":\"3AC\",\"amount\":21400,\"status\":\"booked\"},\"addOns\":[{\"name\":\"Jeep safari\",\"persons\":5,\"rate\":700}],\"initial\":{\"package\":[{\"amount\":20000,\"date\":\"$TODAY\"},{\"amount\":30000,\"date\":\"$TODAY\"}],\"ticket\":[{\"amount\":11800,\"date\":\"$TODAY\"},{\"amount\":9600,\"date\":\"$TODAY\"}],\"addOn\":[{\"amount\":3500,\"date\":\"$TODAY\"}]}}" $B/api/tours/$GT/bookings)
+BK=$(echo "$R" | jq_ "d['tour']['bookings'][0]['_id']")
+check "booking: package due" $(echo "$R" | jq_ "int(d['tour']['bookings'][0]['money']['pkgDue'])") 40000
+check "booking: ticket & jeep settled" $(echo "$R" | jq_ "'%d/%d' % (d['tour']['bookings'][0]['money']['ticketDue'], d['tour']['bookings'][0]['money']['addOnDue'])") 0/0
+check "booking pax counted" $(echo "$R" | jq_ "'%d+%d' % (d['bookingTotals']['adults'], d['bookingTotals']['children'])") 3+2
+check "bookings count as tour revenue" $(echo "$R" | jq_ "int(d['summary']['revenue'])") 114900
+check "overpay on package rejected" $(code -d "{\"kind\":\"package\",\"amount\":50000,\"date\":\"$TODAY\"}" $B/api/tours/$GT/bookings/$BK/payments) 400
+check "package instalment recorded" $(req -d "{\"kind\":\"package\",\"amount\":40000,\"date\":\"$TODAY\"}" $B/api/tours/$GT/bookings/$BK/payments | jq_ "d['tour']['bookings'][0]['money']['payStatus']") paid
+check "can't lower package below received" $(code -X PATCH -d '{"guestName":"E2E Sourav","amount":50000,"ticket":{"mode":"by_us","amount":21400,"status":"booked"},"addOns":[{"name":"Jeep safari","persons":5,"rate":700}]}' $B/api/tours/$GT/bookings/$BK) 400
+check "can't switch to own ticket while holding ticket money" $(code -X PATCH -d '{"guestName":"E2E Sourav","amount":90000,"ticket":{"mode":"own"},"addOns":[{"name":"Jeep safari","persons":5,"rate":700}]}' $B/api/tours/$GT/bookings/$BK) 400
+R=$(req -X PATCH -d '{"guestName":"E2E Sourav","phone":"9836553074","amount":90000,"ticket":{"mode":"by_us","amount":21400,"refunded":21400,"status":"cancelled"},"addOns":[{"name":"Jeep safari","persons":5,"rate":700}]}' $B/api/tours/$GT/bookings/$BK)
+check "cancelled + refunded ticket: nothing due" $(echo "$R" | jq_ "'%d/%d' % (d['tour']['bookings'][0]['money']['ticketCharge'], d['tour']['bookings'][0]['money']['due'])") 0/0
+check "ticket payment kept after edit" $(echo "$R" | jq_ "len(d['tour']['bookings'][0]['ticket']['payments'])") 2
+check "ticket payment on cancelled ticket rejected" $(code -d "{\"kind\":\"ticket\",\"amount\":100,\"date\":\"$TODAY\"}" $B/api/tours/$GT/bookings/$BK/payments) 400
+R=$(req -d '{"guestName":"E2E Spot Payer","amount":45000,"addOns":[{"name":"Jeep safari","persons":3,"rate":700},{"name":"Camel ride","persons":3,"rate":200}],"payAtSpot":true}' $B/api/tours/$GT/bookings)
+check "pay-at-spot total" $(echo "$R" | jq_ "int(d['bookingTotals']['dueOnSpot'])") 2700
+B2=$(echo "$R" | jq_ "d['tour']['bookings'][1]['_id']")
+check "cancelled booking left out of totals" $(req -X PATCH -d '{"guestName":"E2E Spot Payer","amount":45000,"status":"cancelled"}' $B/api/tours/$GT/bookings/$B2 | jq_ "'%d/%d' % (d['bookingTotals']['bookings'], d['bookingTotals']['cancelled'])") 1/1
+check "booking deleted" $(req -X DELETE $B/api/tours/$GT/bookings/$B2 | jq_ "len(d['tour']['bookings'])") 1
+check "tour list shows booking count" $(req "$B/api/tours?q=E2E%20Desert" | jq_ "d['items'][0]['counts']['bookings']") 1
+req -X DELETE $B/api/tours/$GT >/dev/null
 echo "Agent permissions"
 cp $J $A; J=$(mktemp)
 check "agent login" $(code -d '{"email":"priya@demo.aalattravels.in","password":"Demo@1234"}' $B/api/auth/login) 200

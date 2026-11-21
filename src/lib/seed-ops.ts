@@ -132,6 +132,67 @@ export async function seedOpsDemo(o: { adminId?: Types.ObjectId; invoices: Inv[]
     isDemo: true,
   });
 
+  /* ── Group departure with a guest booking register (like the office's Excel sheet) */
+  const gStart = new Date(Date.now() + 9 * D);
+  gStart.setHours(0, 0, 0, 0);
+  const ACT = [{ name: "Jeep safari", rate: 700 }, { name: "Camel ride", rate: 200 }];
+  const P = (list: number[], daysBack: number, note = "Advance") => list.map((amount, i) => ({ amount, date: new Date(Date.now() - (daysBack - i * 6) * D), method: i % 2 ? "cash" : "upi", note: list.length > 1 ? `${note} ${i + 1}` : note }));
+  type Bk = [string, string, string, number, number, number, string, number, number[], ("none" | "by_us" | "own")?, number?, number[]?, string?, number?, string?, number?, number?, number[]?, boolean?, string?, string?];
+  // name, phone, bill, adults, children, rooms, roomType, amount, advances, ticketMode, ticketAmt, ticketPaid, ticketDetails, refunded, ticketStatus, jeep, camel, activityPaid, payAtSpot, remarks, status
+  const rows: Bk[] = [
+    ["Subhajit Roy", "9830528203", "Digital", 2, 0, 1, "Private room", 45000, [10000, 24000, 11000], "by_us", 11000, [10000, 1000], "3AC Howrah → Jaisalmer", 0, "booked", 2, 2, [1800]],
+    ["Moumita Saha", "9831719232", "1482", 2, 0, 1, "Sharing", 44000, [10000, 10462], "own", 0, [], "", 0, "pending", 0, 2, [], true, "Balance before departure"],
+    ["Debasish Pal", "9433199116", "BOTH", 3, 0, 1, "Sharing", 44000, [4000, 7000, 9000], "by_us", 5000, [5000], "AC Duranta", 0, "booked", 0, 0, [], false, "", ],
+    ["Ananya Ghosh", "9874544070", "1483", 1, 0, 1, "Solo (sharing)", 22500, [5000, 10000, 7500], "by_us", 1500, [], "", 0, "to_cancel", 0, 0, [], false, "Ticket will be cancelled"],
+    ["Rupa Mondal", "9007780747", "DG", 1, 0, 1, "Solo (sharing)", 22500, [3000, 18000], "own"],
+    ["Tapas Banerjee", "9830083883", "1490", 3, 0, 1, "Triple share", 63000, [15000], "own", 0, [], "", 0, "pending", 0, 0, [], false, "Will pay balance on arrival in Jaipur"],
+    ["Sourav Dutta", "9836653074", "1485", 3, 2, 2, "Private room", 90000, [20000, 30000, 20000, 20000], "by_us", 21400, [11800, 9600], "3AC", 0, "booked", 5, 0, [3500]],
+    ["Priyanka Sen", "9051156806", "1486", 4, 0, 2, "Private room", 88000, [20000, 27778, 40222], "by_us", 20000, [20000], "Flight CCU → JAI", 0, "booked", 0, 0, [], false, "20K for flight ticket"],
+    ["Arindam Kar", "9830001308", "1487", 2, 0, 1, "Private room", 45000, [10000, 14000], "by_us", 11220, [11220], "AC Duranta", 0, "booked", 0, 2, [400]],
+    ["Kakoli Das", "9903539375", "1493", 2, 1, 1, "Private room", 64500, [36000, 28500], "by_us", 7500, [7500], "3AC", 0, "booked", 3, 2, [2500], false, "2 camel & 3 jeep"],
+    ["Rahul Chatterjee", "9433360778", "1494", 2, 0, 1, "Private room", 45000, [6000, 14000, 764], "by_us", 10000, [10000], "3AC", 0, "booked", 0, 0, [], false, "Extra room needed", ],
+    ["Sumana Biswas", "9831709078", "Digital", 3, 1, 1, "Private room", 58500, [10000, 10000, 30000], "own", 0, [], "", 0, "pending", 6, 6, [5400]],
+    ["Joydeep Halder", "9007005275", "2505", 3, 0, 1, "Triple share", 64500, [15000, 21000, 28500], "by_us", 15000, [15000], "3AC", 0, "booked", 3, 3, [], true, "Jeep + camel — will pay there"],
+    ["Rina Paul", "9830189737", "2507", 2, 0, 1, "Private room", 45000, [10000, 14000, 21000], "by_us", 10443, [10443], "3AC", 0, "booked", 2, 0, [1400]],
+    ["Bikram Sarkar", "9874509583", "2511", 4, 1, 2, "Private room", 96000, [20000, 41334, 34666], "by_us", 22332, [10000, 12332], "3AC", 0, "booked", 5, 0, [3500], false, "Paid for jeep only"],
+    ["Nandini Roy", "9163110654", "2313", 2, 0, 1, "Private room", 64500, [5000, 5000, 5000], "by_us", 10000, [10000], "", 10000, "cancelled", 0, 0, [], false, "Ticket refunded — 10K returned"],
+    ["Ashok Kundu", "9830908938", "2315", 1, 0, 1, "Solo (own room)", 22500, [2500], "none", 0, [], "", 0, "pending", 0, 0, [], false, "", "cancelled"],
+  ];
+  const bookings = rows.map(([guestName, phone, billNo, adults, children, rooms, roomType, amount, adv, mode = "none", tAmt = 0, tPaid = [], tDet = "", refunded = 0, tStatus = "pending", jeep = 0, camel = 0, aPaid = [], payAtSpot = false, remarks = "", status = "confirmed"], i) => ({
+    guestName, phone: "91" + phone, billNo, adults, children, rooms, roomType, amount,
+    extraAmount: i === 10 ? 7000 : 0, extraNote: i === 10 ? "Extra room" : "",
+    payments: P(adv, 40 - i),
+    ticket: { mode, kind: tDet.startsWith("Flight") ? "flight" : "train", details: tDet.replace(/^Flight\s*/, ""), amount: tAmt, payments: P(tPaid, 35 - i, "Ticket"), refunded, status: tStatus },
+    addOns: [{ name: "Jeep safari", persons: jeep, rate: 700 }, { name: "Camel ride", persons: camel, rate: 200 }].filter((a) => a.persons),
+    addOnPayments: P(aPaid, 20, "Activities"),
+    payAtSpot, remarks, status,
+  }));
+  await Tour.create({
+    name: "Rajasthan Desert Group — Batch 1",
+    destination: "Jaipur · Jaisalmer · Jodhpur",
+    startDate: gStart,
+    endDate: new Date(gStart.getTime() + 7 * D),
+    pax: 40,
+    status: "planned",
+    activities: ACT,
+    bookings,
+    hotels: [
+      { hotelName: "Hotel Pink Pearl", city: "Jaipur", checkIn: gStart, checkOut: new Date(gStart.getTime() + 2 * D), rooms: 19, roomType: "Deluxe", mealPlan: "MAP", amount: 190000, payments: [pay(60000, 15, "bank_transfer")] },
+      { hotelName: "Blue City Residency", city: "Jodhpur", checkIn: new Date(gStart.getTime() + 4 * D), checkOut: new Date(gStart.getTime() + 7 * D), rooms: 19, roomType: "Deluxe", mealPlan: "MAP", amount: 228000, payments: [pay(50000, 12, "bank_transfer")] },
+      { vendor: desert._id, hotelName: "Hotel Desert Pearl", city: "Jaisalmer", checkIn: new Date(gStart.getTime() + 2 * D), checkOut: new Date(gStart.getTime() + 4 * D), rooms: 18, roomType: "Swiss tent", mealPlan: "MAP", amount: 216000, payments: [pay(80000, 15, "bank_transfer")] },
+    ],
+    cars: [{ vendor: marwar._id, vehicleType: "AC Bus (45 seater)", carNumber: "RJ14 PB 7781", driverName: "Suresh Meena", driverPhone: "919829000501", fromDate: gStart, toDate: new Date(gStart.getTime() + 7 * D), amount: 112000, payments: [pay(30000, 15)] }],
+    staff: [{ staff: staff[2]._id, name: staff[2].name, role: "Tour manager", days: 8, amount: 12000, payments: [] }, { staff: staff[3]._id, name: staff[3].name, role: "Cook", days: 8, amount: 9600, payments: [] }],
+    expenses: [
+      { category: "train", description: "Group 3AC Howrah → Jaisalmer (12 bookings)", amount: 133895, payments: [pay(133895, 30, "upi", "Paid on booking")] },
+      { category: "guide", description: "Jeep safari & camel operator, Sam dunes", amount: 16800, payments: [] },
+      { category: "entry", description: "Amber Fort, Mehrangarh & museum tickets", amount: 26400, payments: [] },
+    ],
+    notes: "Group departure. Jeep safari ₹700 and camel ride ₹200 per person at Sam dunes.",
+    createdBy: by,
+    isDemo: true,
+  });
+
   /* ── Store inventory: buy in, then issue some to the Kashmir group */
   const items = await InventoryItem.insertMany([
     { name: "Basmati rice", category: "grocery", unit: "kg", minStock: 20, isDemo: true },
@@ -225,7 +286,7 @@ export async function seedOpsDemo(o: { adminId?: Types.ObjectId; invoices: Inv[]
       isDemo: true,
     },
   ]);
-  return { staff: staff.length, vendors: v.length, tours: 3, items: items.length };
+  return { staff: staff.length, vendors: v.length, tours: 4, items: items.length };
 }
 
 export async function clearOpsDemo() {

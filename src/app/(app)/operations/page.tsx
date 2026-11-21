@@ -12,8 +12,8 @@ import { useMe } from "@/components/session";
 import { OpsTabs } from "@/components/ops-tabs";
 import { TourModal, type TourHead } from "./tour-modal";
 
-type Sum = { cost: number; paid: number; due: number; revenue: number; collected: number; profit: number; margin: number | null };
-type Row = TourHead & { _id: string; counts: { hotels: number; cars: number; staff: number; expenses: number }; summary: Sum };
+type Sum = { pax: { adults: number; children: number; bookings: number }; cost: number; paid: number; due: number; revenue: number; collected: number; profit: number; margin: number | null };
+type Row = TourHead & { _id: string; counts: { hotels: number; cars: number; staff: number; expenses: number; bookings: number }; summary: Sum };
 
 export default function OperationsPage() {
   const me = useMe();
@@ -80,8 +80,9 @@ export default function OperationsPage() {
                   </div>
                 </div>
                 <p className="mt-2.5 text-xs text-muted">
+                  {r.counts.bookings > 0 && <span className="font-semibold text-ink">{r.counts.bookings} booking{r.counts.bookings === 1 ? "" : "s"} · {s.pax.adults}{s.pax.children ? `+${s.pax.children}` : ""} pax · </span>}
                   {r.counts.hotels} hotel{r.counts.hotels === 1 ? "" : "s"} · {r.counts.cars} car{r.counts.cars === 1 ? "" : "s"} · {r.counts.staff} staff · {r.counts.expenses} expense{r.counts.expenses === 1 ? "" : "s"}
-                  {s.revenue > 0 && ` · billed ${money(s.revenue)}`}
+                  {s.revenue > 0 && ` · billed ${money(s.revenue)} · received ${money(s.collected)}`}
                 </p>
               </Link>
             );

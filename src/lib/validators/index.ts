@@ -291,3 +291,35 @@ export const StockMovementInput = z.discriminatedUnion("type", [
   z.object({ type: z.literal("out"), quantity: z.coerce.number().positive("Enter the quantity"), tour: z.string().min(1, "Choose the tour"), date: z.coerce.date(), note: optStr(200) }),
   z.object({ type: z.literal("adjust"), quantity: z.coerce.number().refine((v) => v !== 0, "Enter a non-zero quantity"), date: z.coerce.date(), note: str(200).min(2, "Give a reason (e.g. damaged, recount)") }),
 ]);
+
+const PaymentLine = z.object({ amount: z.coerce.number().positive(), date: z.coerce.date(), method: z.enum(["upi", "bank_transfer", "cash", "card", "cheque"]).default("cash"), note: optStr(200) });
+export const BookingInput = z.object({
+  guestName: str(120).min(2, "Guest name is required"),
+  phone: z.string().trim().max(40).optional().default(""),
+  billNo: optStr(60),
+  adults: z.coerce.number().int().min(0).max(500).default(1),
+  children: z.coerce.number().int().min(0).max(500).default(0),
+  rooms: z.coerce.number().int().min(0).max(200).default(1),
+  roomType: optStr(60),
+  amount: z.coerce.number().min(0).max(1e8),
+  extraAmount: z.coerce.number().min(0).max(1e8).default(0),
+  extraNote: optStr(120),
+  ticket: z
+    .object({
+      mode: z.enum(["none", "by_us", "own"]).default("none"),
+      kind: z.enum(["train", "flight", "bus"]).default("train"),
+      details: optStr(160),
+      amount: z.coerce.number().min(0).max(1e7).default(0),
+      refunded: z.coerce.number().min(0).max(1e7).default(0),
+      status: z.enum(["pending", "booked", "to_cancel", "cancelled"]).default("pending"),
+    })
+    .default({ mode: "none", kind: "train", details: "", amount: 0, refunded: 0, status: "pending" }),
+  addOns: z.array(z.object({ name: str(60).min(1), persons: z.coerce.number().int().min(0).max(500), rate: z.coerce.number().min(0).max(1e6) })).max(20).default([]),
+  payAtSpot: z.boolean().default(false),
+  remarks: optStr(600),
+  status: z.enum(["confirmed", "cancelled"]).default("confirmed"),
+  // only when creating: instalments already received ("10000+24000")
+  initial: z.object({ package: z.array(PaymentLine).max(20).default([]), ticket: z.array(PaymentLine).max(20).default([]), addOn: z.array(PaymentLine).max(20).default([]) }).optional(),
+});
+export const BookingPaymentInput = z.object({ kind: z.enum(["package", "ticket", "addOn"]), amount: z.coerce.number().positive("Enter an amount"), date: z.coerce.date(), method: z.enum(["upi", "bank_transfer", "cash", "card", "cheque"]).default("cash"), note: optStr(200) });
+export const ActivitiesInput = z.object({ activities: z.array(z.object({ name: str(60).min(1, "Activity name is required"), rate: z.coerce.number().min(0).max(1e6) })).max(20) });

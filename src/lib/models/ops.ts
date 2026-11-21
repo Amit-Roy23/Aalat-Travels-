@@ -130,6 +130,39 @@ const ExpenseLineSchema = new Schema({
   stockMovement: { type: ObjectId, ref: "StockMovement" },
   ...base,
 });
+// Guest bookings on a group departure (the client's booking register)
+const AddOnSchema = new Schema({ name: { type: String, required: true }, persons: { type: Number, default: 0, min: 0 }, rate: { type: Number, default: 0, min: 0 } }, { _id: false });
+const BookingSchema = new Schema(
+  {
+    guestName: { type: String, required: true, trim: true },
+    phone: { type: String, default: "" },
+    customer: { type: ObjectId, ref: "Customer" },
+    billNo: { type: String, default: "" },
+    adults: { type: Number, default: 1, min: 0 },
+    children: { type: Number, default: 0, min: 0 },
+    rooms: { type: Number, default: 1, min: 0 },
+    roomType: { type: String, default: "" },
+    amount: { type: Number, default: 0, min: 0 }, // package price
+    extraAmount: { type: Number, default: 0, min: 0 }, // e.g. extra room
+    extraNote: { type: String, default: "" },
+    payments: { type: [LinePaymentSchema], default: [] },
+    ticket: {
+      mode: { type: String, enum: ["none", "by_us", "own"], default: "none" },
+      kind: { type: String, enum: ["train", "flight", "bus"], default: "train" },
+      details: { type: String, default: "" },
+      amount: { type: Number, default: 0, min: 0 },
+      payments: { type: [LinePaymentSchema], default: [] },
+      refunded: { type: Number, default: 0, min: 0 },
+      status: { type: String, enum: ["pending", "booked", "to_cancel", "cancelled"], default: "pending" },
+    },
+    addOns: { type: [AddOnSchema], default: [] },
+    addOnPayments: { type: [LinePaymentSchema], default: [] },
+    payAtSpot: { type: Boolean, default: false },
+    remarks: { type: String, default: "" },
+    status: { type: String, enum: ["confirmed", "cancelled"], default: "confirmed" },
+  },
+  { timestamps: true },
+);
 const TourSchema = new Schema(
   {
     name: { type: String, required: true, trim: true },
@@ -143,6 +176,8 @@ const TourSchema = new Schema(
     cars: { type: [CarLineSchema], default: [] },
     staff: { type: [StaffLineSchema], default: [] },
     expenses: { type: [ExpenseLineSchema], default: [] },
+    bookings: { type: [BookingSchema], default: [] },
+    activities: { type: [new Schema({ name: { type: String, required: true }, rate: { type: Number, default: 0, min: 0 } }, { _id: false })], default: [] },
     notes: { type: String, default: "" },
     createdBy: { type: ObjectId, ref: "User" },
     isDemo: { type: Boolean, default: false },

@@ -12,11 +12,12 @@ import { TourModal } from "../tour-modal";
 import { LineModal, PayModal, type Line, type Section } from "./line-modals";
 import { InvoiceLinkModal } from "./invoice-link";
 import { CostSheetPrint } from "./cost-sheet-print";
+import { BookingsPanel, type Booking, type BookingTotals } from "./bookings";
 
 type Bucket = { amount: number; paid: number; due: number; count: number };
-export type Summary = { sections: Record<Section, Bucket>; categories: Record<string, Bucket>; cost: number; paid: number; due: number; revenue: number; collected: number; profit: number; margin: number | null };
+export type Summary = { sections: Record<Section, Bucket>; categories: Record<string, Bucket>; cost: number; paid: number; due: number; revenue: number; collected: number; invoiceRevenue: number; bookingRevenue: number; guestDue: number; profit: number; margin: number | null };
 type Inv = { _id: string; number: string; total: number; amountPaid: number; balance: number; status: string; tripTitle: string; customer?: { name: string; phone: string } | null };
-export type TourDoc = { _id: string; name: string; destination: string; startDate: string; endDate?: string | null; pax: number; status: string; notes: string; invoices: Inv[]; hotels: Line[]; cars: Line[]; staff: Line[]; expenses: Line[] };
+export type TourDoc = { _id: string; name: string; destination: string; startDate: string; endDate?: string | null; pax: number; status: string; notes: string; invoices: Inv[]; hotels: Line[]; cars: Line[]; staff: Line[]; expenses: Line[]; bookings: Booking[]; activities: { name: string; rate: number }[] };
 
 const nights = (a?: string | null, b?: string | null) => (a && b ? Math.max(0, Math.round((new Date(b).getTime() - new Date(a).getTime()) / 86400000)) : null);
 const short = (d?: string | null) => (d ? fmtDate(d, { day: "2-digit", month: "short" }) : "—");
@@ -26,17 +27,20 @@ export default function TourPage({ params }: { params: Promise<{ id: string }> }
   const me = useMe();
   const router = useRouter();
   const { toast, confirm } = useUi();
-  const { data, error, mutate } = useApi<{ tour: TourDoc; summary: Summary }>(me.user.role === "admin" ? `/api/tours/${id}` : null);
+  const { data, error, mutate } = useApi<{ tour: TourDoc; summary: Summary; bookingTotals: BookingTotals }>(me.user.role === "admin" ? `/api/tours/${id}` : null);
   const [edit, setEdit] = useState(false);
   const [lineModal, setLineModal] = useState<{ section: Section; line?: Line } | null>(null);
   const [pay, setPay] = useState<{ section: Section; line: Line } | null>(null);
   const [linkInv, setLinkInv] = useState(false);
+  const [tab, setTab] = useState<"bookings" | "costs" | null>(null);
   if (me.user.role !== "admin") return <ErrorState error={new Error("Only admins can see operations.")} />;
   if (error) return <ErrorState error={error} retry={() => mutate()} />;
   if (!data) return <PageLoader />;
   const { tour, summary: s } = data;
   const st = TOUR_STATUSES.find((x) => x.value === tour.status)!;
-  const set = (d: { tour: TourDoc; summary: Summary }) => mutate(d, { revalidate: false });
+  const set = (d: { tour: TourDoc; summary: Summary; bookingTotals?: BookingTotals }) => mutate({ ...data, ...d, bookingTotals: d.bookingTotals ?? data.bookingTotals }, { revalidate: false });
+  const hasCosts = tour.hotels.length + tour.cars.length + tour.staff.length + tour.expenses.length > 0;
+  const view = tab ?? (tour.bookings.length || !hasCosts ? "bookings" : "costs");
 
   const removeLine = async (section: Section, l: Line) => {
     const fromStore = !!l.stockMovement;
@@ -126,12 +130,21 @@ export default function TourPage({ params }: { params: Promise<{ id: string }> }
 
         {/* Totals */}
         <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <Stat label="Total investment" value={money(s.cost)} foot={`${breakdown.length} heads`} />
-          <Stat label="Advance / paid" value={money(s.paid)} tone="text-leaf" foot={s.cost ? `${Math.round((s.paid / s.cost) * 100)}% paid` : "—"} />
-          <Stat label="Due to pay" value={money(s.due)} tone={s.due > 0 ? "text-coral" : undefined} foot="Hotels, cars, staff & expenses" />
-          <Stat label="Profit" value={s.revenue ? money(s.profit) : "—"} tone={s.revenue ? (s.profit < 0 ? "text-coral" : "text-leaf") : undefined} foot={s.revenue ? `Billed ${money(s.revenue)}${s.margin !== null ? ` · ${s.margin}% margin` : ""}` : "Link the guest invoice to see profit"} />
+          <Stat label="Billed to guests" value={money(s.revenue)} foot={s.revenue ? `Received ${money(s.collected)} · due ${money(s.guestDue)}` : "Add guest bookings or link an invoice"} />
+          <Stat label="Total investment" value={money(s.cost)} foot={s.cost ? `Paid ${money(s.paid)} · ${Math.round((s.paid / s.cost) * 100)}%` : "Hotels, cars, staff & expenses"} />
+          <Stat label="Due to pay" value={money(s.due)} tone={s.due > 0 ? "text-coral" : undefined} foot="To hotels, cars, staff & suppliers" />
+          <Stat label="Profit" value={s.revenue ? money(s.profit) : "—"} tone={s.revenue ? (s.profit < 0 ? "text-coral" : "text-leaf") : undefined} foot={s.revenue ? `Billed − investment${s.margin !== null ? ` · ${s.margin}% margin` : ""}` : "Shows once guests are billed"} />
         </div>
 
+        <div className="no-scrollbar mb-5 flex w-fit max-w-full gap-1 overflow-x-auto rounded-xl bg-surface-2 p-1">
+          {([["bookings", `Guest bookings (${data.bookingTotals.bookings})`], ["costs", "Cost sheet & profit"]] as const).map(([v, l]) => (
+            <button key={v} onClick={() => setTab(v)} className={cn("shrink-0 rounded-lg px-3 py-1.5 text-[13px] font-semibold", view === v ? "bg-surface text-ink shadow-card" : "text-muted hover:text-ink")}>{l}</button>
+          ))}
+        </div>
+
+        {view === "bookings" ? (
+          <BookingsPanel tour={tour} totals={data.bookingTotals} onSaved={set} />
+        ) : (
         <div className="grid gap-5 xl:grid-cols-[1fr_340px]">
           <div className="space-y-5">
             <SectionCard icon={<BedDouble className="h-4 w-4" />} title="Hotels" b={s.sections.hotels} onAdd={() => setLineModal({ section: "hotels" })} empty="No hotel booked yet.">
@@ -212,7 +225,15 @@ export default function TourPage({ params }: { params: Promise<{ id: string }> }
             </Card>
 
             <Card title="Guest billing" action={<Button size="sm" variant="ghost" icon={<Plus className="h-4 w-4" />} onClick={() => setLinkInv(true)}>Link</Button>}>
-              {tour.invoices.length === 0 ? (
+              {tour.invoices.length === 0 && s.bookingRevenue > 0 ? (
+                <div className="space-y-1 text-sm">
+                  <Kv k="Billed (guest bookings)" v={money(s.bookingRevenue)} />
+                  <Kv k="Received from guests" v={money(s.collected)} />
+                  <Kv k="Total investment" v={`− ${money(s.cost)}`} />
+                  <Kv k="Profit" v={money(s.profit)} bold tone={s.profit < 0 ? "text-coral" : "text-leaf"} />
+                  <Kv k="Cash in hand (received − paid out)" v={money(s.collected - s.paid)} />
+                </div>
+              ) : tour.invoices.length === 0 ? (
                 <p className="text-sm text-muted">Link the guest&apos;s invoice to compare billing against cost and see the profit.</p>
               ) : (
                 <ul className="space-y-2.5">
@@ -230,6 +251,7 @@ export default function TourPage({ params }: { params: Promise<{ id: string }> }
                     </li>
                   ))}
                   <li className="space-y-1 border-t border-line pt-2.5 text-sm">
+                    {s.bookingRevenue > 0 && <Kv k="Guest bookings" v={money(s.bookingRevenue)} />}
                     <Kv k="Billed to guests" v={money(s.revenue)} />
                     <Kv k="Received from guests" v={money(s.collected)} />
                     <Kv k="Total investment" v={`− ${money(s.cost)}`} />
@@ -246,6 +268,7 @@ export default function TourPage({ params }: { params: Promise<{ id: string }> }
             )}
           </div>
         </div>
+        )}
       </div>
 
       <CostSheetPrint tour={tour} summary={s} />

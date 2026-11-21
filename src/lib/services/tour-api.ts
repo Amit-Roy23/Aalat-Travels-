@@ -2,9 +2,11 @@
 import type { Types } from "mongoose";
 import type { z } from "zod";
 import { HttpError, oid } from "../api";
-import { Invoice, Staff, StockMovement, Tour, Vendor } from "../models";
-import { TourLineInput } from "../validators";
+import { Customer, Invoice, Staff, StockMovement, Tour, Vendor } from "../models";
+import { normalizePhone } from "../format";
+import { BookingInput, TourLineInput } from "../validators";
 import { SECTIONS, tourSummary, withTotals, type Section } from "./tours";
+import { bookingMoney, bookingTotals, type BookingLike } from "../bookings";
 
 type LineIn = z.infer<typeof TourLineInput>;
 type SubDoc = { _id: Types.ObjectId; amount: number; payments: { amount: number }[]; stockMovement?: Types.ObjectId; set: (v: unknown) => void; deleteOne: () => void };
@@ -25,7 +27,9 @@ export async function loadTour(id: string) {
   const invoices = t.invoices as unknown as { total: number; amountPaid: number; status: string }[];
   const out: Record<string, unknown> = { ...t };
   for (const s of SECTIONS) out[s] = (t[s] as { amount: number }[]).map(withTotals);
-  return { tour: out, summary: tourSummary(t, invoices) };
+  const bookings = (t.bookings ?? []) as unknown as BookingLike[];
+  out.bookings = bookings.map((b) => ({ ...b, money: bookingMoney(b) }));
+  return { tour: out, summary: tourSummary(t, invoices), bookingTotals: bookingTotals(bookings) };
 }
 
 /** Validates references and turns a request line into the stored shape (without payments). */
@@ -89,4 +93,36 @@ export async function vendorLedger(vendorId?: Types.ObjectId) {
   }
   entries.sort((a, b) => new Date(b.date ?? 0).getTime() - new Date(a.date ?? 0).getTime());
   return entries;
+}
+
+/* ───────── Guest bookings ───────── */
+type BookingIn = z.infer<typeof BookingInput>;
+type BookingDoc = BookingLike & { _id: Types.ObjectId; ticket: NonNullable<BookingLike["ticket"]>; set: (v: unknown) => void; deleteOne: () => void };
+
+export async function findBooking(id: string, bookingId: string) {
+  const t = await Tour.findById(oid(id));
+  if (!t) throw new HttpError(404, "Tour not found.");
+  const b = (t.bookings as unknown as { id: (x: string) => BookingDoc | null }).id(String(oid(bookingId)));
+  if (!b) throw new HttpError(404, "Booking not found.");
+  return { t, b };
+}
+
+/** Normalises a booking request and links it to the CRM customer with the same phone. */
+export async function prepareBooking(d: BookingIn) {
+  const phone = normalizePhone(d.phone);
+  const c = phone ? await Customer.findOne({ phone }).select("_id").lean() : null;
+  const { initial: _i, ...rest } = d;
+  void _i;
+  return { ...rest, phone, customer: c?._id ?? undefined };
+}
+
+/** Money already received can never exceed what is charged. */
+export function checkBookingMoney(b: BookingLike) {
+  const m = bookingMoney(b);
+  const t = b.ticket ?? {};
+  if (m.pkgPaid > m.pkg + 0.001) throw new HttpError(400, `Package amount can't be less than the ${m.pkgPaid} already received.`);
+  if ((t.refunded ?? 0) > m.ticketPaid + 0.001) throw new HttpError(400, "Refund can't be more than the ticket money received.");
+  if (t.mode !== "by_us" && m.ticketNet > 0.001) throw new HttpError(400, "Ticket money has been received for this booking — record it as refunded before changing the ticket to 'own' or 'none'.");
+  if (t.mode === "by_us" && t.status !== "cancelled" && m.ticketNet > m.ticketCharge + 0.001) throw new HttpError(400, "Ticket charge can't be less than the ticket money received (minus refunds).");
+  if (m.addOnPaid > m.addOn + 0.001) throw new HttpError(400, "Activities total can't be less than what has already been paid for them.");
 }
