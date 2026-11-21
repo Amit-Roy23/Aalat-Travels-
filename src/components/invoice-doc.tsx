@@ -27,7 +27,7 @@ export type InvoiceDocData = {
   installments?: { _id?: string; label: string; percent: number; dueDate: string; amount?: number }[];
   tour?: { name?: string; duration?: string; adults?: number; children?: number; rooms?: number; startDate?: string; endDate?: string; startPoint?: string; endPoint?: string; foodPlan?: string; propertyType?: string; vehicleSeat?: string; vehicleType?: string };
 };
-export type CompanyData = { name?: string; tagline?: string; phone?: string; email?: string; website?: string; address?: string; gstin?: string; regNo?: string; logo?: string };
+export type CompanyData = { name?: string; tagline?: string; phone?: string; email?: string; website?: string; address?: string; gstin?: string; regNo?: string; msmeNo?: string; logo?: string };
 
 const stampTone: Record<string, string> = { paid: "border-leaf text-leaf", overdue: "border-coral text-coral", partial: "border-sun text-sun", sent: "border-sky text-sky", draft: "border-slate2 text-slate2", cancelled: "border-slate2 text-slate2" };
 
@@ -102,6 +102,7 @@ export function InvoiceDocument({ inv, company, bank, className }: { inv: Invoic
               {[company.address, company.phone, company.email, company.website].filter(Boolean).join("\n")}
               {company.gstin && `\nGSTIN: ${company.gstin}`}
               {company.regNo && `\nReg No.: ${company.regNo}`}
+              {company.msmeNo && `\nMSME (Udyam) No.: ${company.msmeNo}`}
             </p>
           </div>
         </div>

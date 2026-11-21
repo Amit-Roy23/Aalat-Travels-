@@ -288,6 +288,7 @@ const SettingsSchema = new Schema(
       address: { type: String, default: "126, Feeder Road, Belgharia, Kolkata - 700056" },
       gstin: { type: String, default: "" },
       regNo: { type: String, default: "PM01592N2023000001" },
+      msmeNo: { type: String, default: "UDYAM-WB-10-0091056" }, // MSME / Udyam registration
       logo: { type: String, default: "" }, // small PNG data URL, uploaded in Settings
     },
     invoice: {

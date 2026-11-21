@@ -106,6 +106,7 @@ export default function SettingsPage() {
                   ["website", "Website"],
                   ["gstin", "GST IN"],
                   ["regNo", "Registration No."],
+                  ["msmeNo", "MSME (Udyam) No."],
                 ] as const
               ).map(([k, l]) => (
                 <Field key={k} label={l}>

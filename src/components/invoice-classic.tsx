@@ -145,6 +145,7 @@ export function ClassicInvoice({ inv, company, settings, className = "" }: { inv
           </p>
           <div className="text-left text-[10.5px] font-semibold sm:text-right sm:text-[12.5px]" style={{ color: RED }}>
             {company.regNo && <p>Reg No. - {company.regNo}</p>}
+            {company.msmeNo && <p>MSME (Udyam) No. - {company.msmeNo}</p>}
             {company.gstin && <p>GST IN - {company.gstin}</p>}
             {company.phone && <p>Cont. No. : {company.phone}</p>}
             {company.address && <p>Corporate Office : {company.address}</p>}
