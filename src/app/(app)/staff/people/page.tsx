@@ -169,14 +169,14 @@ function StaffModal({ staff, onClose, onSaved }: { staff: StaffRow | "new" | nul
         </Field>
         <Field label="Pay type">
           <select className="input" value={f.salaryType} onChange={set("salaryType")}>
-            <option value="monthly">Monthly salary</option>
-            <option value="daily">Daily wage</option>
+            <option value="monthly">Monthly salary (on payroll)</option>
+            <option value="daily">Daily wage (paid per tour)</option>
           </select>
         </Field>
         <Field label={f.salaryType === "daily" ? "Daily wage (₹)" : "Monthly salary (₹)"}>
           <input className="input" type="number" min={0} value={f.salary} onChange={set("salary")} />
         </Field>
-        <Field label="Joining date" hint="Days before joining aren't paid">
+        <Field label="Joining date">
           <input className="input" type="date" value={f.joinDate} onChange={set("joinDate")} />
         </Field>
         <Field label="App login (for self check-in)" hint="Optional — lets them check in / out and apply for leave">
@@ -306,8 +306,8 @@ function PolicyCard() {
     }
   };
   return (
-    <Card title="Attendance & payroll rules" className="mt-5" action={<Button size="sm" onClick={save} loading={busy}>Save rules</Button>}>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    <Card title="Attendance rules" className="mt-5" action={<Button size="sm" onClick={save} loading={busy}>Save rules</Button>}>
+      <div className="grid gap-4 sm:grid-cols-3">
         <Field label="Weekly off">
           <div className="flex flex-wrap gap-1">
             {DAYS.map((d, i) => (
@@ -323,14 +323,8 @@ function PolicyCard() {
         <Field label="Late after (grace minutes)">
           <input className="input" type="number" min={0} value={p.graceMinutes} onChange={(e) => setP({ ...p, graceMinutes: e.target.value })} />
         </Field>
-        <Field label="Days not marked count as">
-          <select className="input" value={p.unmarkedAs} onChange={(e) => setP({ ...p, unmarkedAs: e.target.value })}>
-            <option value="absent">Absent (unpaid)</option>
-            <option value="present">Present</option>
-          </select>
-        </Field>
       </div>
-      <p className="mt-3 text-xs text-muted">Monthly salary = salary − (salary ÷ working days) × unpaid days. Paid leave (casual / sick / earned) and holidays are paid; unpaid leave, absences and half of each half-day are deducted. Daily-wage staff are paid for days present.</p>
+      <p className="mt-3 text-xs text-muted">Attendance, late arrivals and leave are recorded for the office register. Salary is the fixed monthly salary — it is not reduced for leave or absence. Daily-wage tour staff are paid on each tour&apos;s cost sheet in Operations.</p>
     </Card>
   );
 }

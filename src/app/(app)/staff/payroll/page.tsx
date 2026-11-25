@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { AlertTriangle, CheckCircle2, FileText, RefreshCw, RotateCcw, Wallet } from "lucide-react";
+import { CheckCircle2, FileText, RefreshCw, RotateCcw, Wallet } from "lucide-react";
 import { api, qs, useApi } from "@/lib/client";
 import { cn, fmtDate, money, todayKeyIST, toDateInput } from "@/lib/format";
 import { staffTypeLabel } from "@/lib/constants";
@@ -49,7 +49,6 @@ export default function PayrollPage() {
   const [slip, setSlip] = useState<Row | null>(null);
   const [edit, setEdit] = useState<Row | null>(null);
   if (me.user.role !== "admin") return <ErrorState error={new Error("Payroll is available to admins only.")} />;
-  const current = month === todayKeyIST().slice(0, 7);
   const generate = async () => {
     setBusy(true);
     try {
@@ -67,18 +66,17 @@ export default function PayrollPage() {
     toast(`${r.staff.name}: reopened`);
     mutate();
   };
-  const issues = data ? { unmarked: data.items.reduce((s, r) => s + (r.status === "draft" ? r.unmarkedDays : 0), 0), pending: data.items.reduce((s, r) => s + (r.status === "draft" ? r.pendingLeaves : 0), 0) } : null;
 
   return (
     <div className="animate-fade-up">
       <PageHeader
         title="Payroll"
-        subtitle="Monthly salary from attendance — leave, absences, advances and bonuses."
+        subtitle="Fixed monthly salary — with bonus, advance recovery and other deductions."
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <input className="input h-10 w-full min-[380px]:w-44" type="month" max={todayKeyIST().slice(0, 7)} value={month} onChange={(e) => e.target.value && setMonth(e.target.value)} aria-label="Month" />
             <Button onClick={generate} loading={busy} icon={<RefreshCw className="h-4 w-4" />}>
-              {data?.items.length ? "Refresh from attendance" : "Generate payroll"}
+              {data?.items.length ? "Refresh payroll" : "Generate payroll"}
             </Button>
           </div>
         }
@@ -92,7 +90,7 @@ export default function PayrollPage() {
         <>
           <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
             {[
-              ["Earned (after leave)", money(data.totals.earned), ""],
+              ["Monthly salaries", money(data.totals.earned), ""],
               ["Net payable", money(data.totals.net), ""],
               ["Paid", money(data.totals.paid), "text-leaf"],
               ["Still to pay", money(data.totals.pending), data.totals.pending > 0 ? "text-sun" : ""],
@@ -103,16 +101,9 @@ export default function PayrollPage() {
               </div>
             ))}
           </div>
-          {(current || !!issues?.unmarked || !!issues?.pending) && !!data.items.length && (
-            <div className="mb-4 space-y-1.5 rounded-2xl border border-sun/30 bg-sun-soft/60 p-3.5 text-sm text-ink">
-              {current && <p className="flex gap-2"><AlertTriangle className="h-4 w-4 shrink-0 text-sun" /> {monthLabel(month)} isn&apos;t over yet — figures are provisional (days still to come are not counted as absent).</p>}
-              {!!issues?.unmarked && <p className="flex gap-2"><AlertTriangle className="h-4 w-4 shrink-0 text-sun" /> {issues.unmarked} working day(s) have no attendance marked and are counted as absent. Fix them in the attendance register, then refresh.</p>}
-              {!!issues?.pending && <p className="flex gap-2"><AlertTriangle className="h-4 w-4 shrink-0 text-sun" /> {issues.pending} leave day(s) are still awaiting approval and are counted as unpaid until approved.</p>}
-            </div>
-          )}
           {data.items.length === 0 ? (
             <div className="card">
-              <EmptyState icon={<Wallet className="h-6 w-6" />} title={`No payroll for ${monthLabel(month)} yet`} description="Generate it from attendance. You can adjust bonuses and deductions before paying." action={<Button onClick={generate} loading={busy}>Generate payroll</Button>} />
+              <EmptyState icon={<Wallet className="h-6 w-6" />} title={`No payroll for ${monthLabel(month)} yet`} description="Generate it from each staff member's monthly salary. You can add a bonus or deductions before paying. Daily-wage tour staff are paid on the tour cost sheet." action={<Button onClick={generate} loading={busy}>Generate payroll</Button>} />
             </div>
           ) : (
             <div className="card divide-y divide-line overflow-hidden">
@@ -121,27 +112,14 @@ export default function PayrollPage() {
                   <div className="min-w-0 lg:w-56">
                     <p className="font-semibold">{r.staff.name}</p>
                     <p className="text-xs text-muted">
-                      {r.staff.designation || staffTypeLabel(r.staff.type)} · {r.salaryType === "daily" ? `${money(r.rate)}/day` : `${money(r.rate)}/month`}
+                      {r.staff.designation || staffTypeLabel(r.staff.type)} · {money(r.rate)}/month
                     </p>
                   </div>
-                  <div className="flex flex-1 flex-wrap gap-x-4 gap-y-1 text-[12.5px] text-muted">
-                    <span>
-                      Present <b className="text-ink">{r.presentDays}</b>
-                      {r.halfDays ? ` + ${r.halfDays} half` : ""}
-                    </span>
-                    <span>
-                      Paid leave <b className="text-ink">{r.paidLeaves}</b>
-                    </span>
-                    <span>
-                      Unpaid <b className={r.unpaidDays ? "text-coral" : "text-ink"}>{r.unpaidDays}</b>
-                    </span>
-                    {r.salaryType === "monthly" && <span>of {r.workingDays} working days</span>}
-                    {r.lateDays > 0 && <span>Late {r.lateDays}</span>}
-                  </div>
+                  <div className="hidden flex-1 lg:block" />
                   <div className="flex flex-wrap items-center gap-x-5 gap-y-2 lg:justify-end">
                     <div className="text-right text-[12.5px] leading-tight">
-                      <p className="text-muted">Earned {money(r.earned)}</p>
-                      {(r.allowances > 0 || r.bonus > 0) && <p className="text-leaf">+ {money(r.allowances + r.bonus)}</p>}
+                      <p className="text-muted">Salary {money(r.earned)}</p>
+                      {r.bonus > 0 && <p className="text-leaf">+ {money(r.bonus)} bonus</p>}
                       {(r.advanceDeduction > 0 || r.otherDeduction > 0) && <p className="text-coral">− {money(r.advanceDeduction + r.otherDeduction)}</p>}
                     </div>
                     <div className="min-w-[7rem] text-right">
@@ -183,23 +161,23 @@ export default function PayrollPage() {
 
 function AdjustModal({ row, onClose, onSaved }: { row: Row | null; onClose: () => void; onSaved: () => void }) {
   const { toast } = useUi();
-  const [f, setF] = useState({ allowances: "", bonus: "", advanceDeduction: "", otherDeduction: "", note: "" });
+  const [f, setF] = useState({ bonus: "", advanceDeduction: "", otherDeduction: "", note: "" });
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   useEffect(() => {
-    if (row) setF({ allowances: String(row.allowances || ""), bonus: String(row.bonus || ""), advanceDeduction: String(row.advanceDeduction || ""), otherDeduction: String(row.otherDeduction || ""), note: "" });
+    if (row) setF({ bonus: String(row.bonus || ""), advanceDeduction: String(row.advanceDeduction || ""), otherDeduction: String(row.otherDeduction || ""), note: "" });
     setErr("");
   }, [row]);
   if (!row) return null;
   const n = (v: string) => Number(v) || 0;
-  const net = Math.round((row.earned + n(f.allowances) + n(f.bonus) - n(f.advanceDeduction) - n(f.otherDeduction)) * 100) / 100;
+  const net = Math.round((row.earned + n(f.bonus) - n(f.advanceDeduction) - n(f.otherDeduction)) * 100) / 100;
   const save = async () => {
     setErr("");
     if (n(f.advanceDeduction) > row.advanceOutstanding + 0.005) return setErr(`Advance deduction can't exceed the outstanding advance of ${money(row.advanceOutstanding)}.`);
     if (net < 0) return setErr("Deductions are more than the salary.");
     setBusy(true);
     try {
-      await api(`/api/payroll/${row._id}`, { method: "PATCH", body: { allowances: n(f.allowances), bonus: n(f.bonus), advanceDeduction: n(f.advanceDeduction), otherDeduction: n(f.otherDeduction), ...(f.note ? { note: f.note } : {}) } });
+      await api(`/api/payroll/${row._id}`, { method: "PATCH", body: { bonus: n(f.bonus), advanceDeduction: n(f.advanceDeduction), otherDeduction: n(f.otherDeduction), ...(f.note ? { note: f.note } : {}) } });
       toast("Salary updated");
       onClose();
       onSaved();
@@ -210,12 +188,9 @@ function AdjustModal({ row, onClose, onSaved }: { row: Row | null; onClose: () =
     }
   };
   return (
-    <Modal open onClose={onClose} title={`Adjust salary · ${row.staff.name}`} description={`Earned from attendance: ${money(row.earned)}`} size="sm" footer={<><Button variant="ghost" onClick={onClose}>Cancel</Button><Button onClick={save} loading={busy}>Save</Button></>}>
+    <Modal open onClose={onClose} title={`Adjust salary · ${row.staff.name}`} description={`Monthly salary: ${money(row.earned)}`} size="sm" footer={<><Button variant="ghost" onClick={onClose}>Cancel</Button><Button onClick={save} loading={busy}>Save</Button></>}>
       {err && <p className="mb-3 rounded-xl bg-coral-soft px-3 py-2 text-sm font-medium text-coral">{err}</p>}
       <div className="grid grid-cols-2 gap-3">
-        <Field label="Allowances (₹)" hint="Travel, food, phone…">
-          <input className="input" type="number" min={0} value={f.allowances} onChange={(e) => setF({ ...f, allowances: e.target.value })} />
-        </Field>
         <Field label="Bonus / incentive (₹)">
           <input className="input" type="number" min={0} value={f.bonus} onChange={(e) => setF({ ...f, bonus: e.target.value })} />
         </Field>
@@ -276,8 +251,7 @@ function Payslip({ row, onClose }: { row: Row | null; onClose: () => void }) {
   const me = useMe();
   if (!row) return null;
   const lines: [string, number, string][] = [
-    ["Earned (attendance)", row.earned, ""],
-    ["Allowances", row.allowances, "+"],
+    ["Monthly salary", row.earned, ""],
     ["Bonus / incentive", row.bonus, "+"],
     ["Advance recovered", row.advanceDeduction, "−"],
     ["Other deductions", row.otherDeduction, "−"],
@@ -300,26 +274,11 @@ function Payslip({ row, onClose }: { row: Row | null; onClose: () => void }) {
             <span className="text-[#6b6b6b]">Role:</span> {row.staff.designation || staffTypeLabel(row.staff.type)}
           </p>
           <p>
-            <span className="text-[#6b6b6b]">{row.salaryType === "daily" ? "Daily wage" : "Monthly salary"}:</span> {money(row.rate)}
+            <span className="text-[#6b6b6b]">Pay period:</span> {monthLabel(row.month)}
           </p>
           <p>
             <span className="text-[#6b6b6b]">Status:</span> {row.status === "paid" ? `Paid on ${fmtDate(row.paidOn)}` : "Not paid yet"}
           </p>
-        </div>
-        <div className="mt-3 grid grid-cols-3 gap-2 rounded-xl bg-[#FFF5D1] p-2.5 text-center text-xs sm:grid-cols-6">
-          {[
-            ["Working days", row.workingDays],
-            ["Present", row.presentDays],
-            ["Half days", row.halfDays],
-            ["Paid leave", row.paidLeaves],
-            ["Holidays", row.holidays],
-            ["Unpaid days", row.unpaidDays],
-          ].map(([l, v]) => (
-            <div key={l as string}>
-              <p className="font-bold">{v}</p>
-              <p className="text-[#6b6b6b]">{l}</p>
-            </div>
-          ))}
         </div>
         <table className="mt-3 w-full">
           <tbody>
