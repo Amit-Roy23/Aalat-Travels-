@@ -1,6 +1,6 @@
 // Attendance & payroll rules (all dates are India time; a day is identified by its "YYYY-MM-DD" key).
 import type { Types } from "mongoose";
-import { Attendance, Payroll, SalaryAdvance, Staff } from "../models";
+import { Payroll, SalaryAdvance, Staff } from "../models";
 import { APP_TZ, LEAVE_TYPES } from "../constants";
 import { round2 } from "../format";
 
@@ -103,31 +103,33 @@ export async function outstandingAdvances(staffId: Types.ObjectId | string) {
   return { list, total: round2(list.reduce((s, a) => s + Math.max(0, a.amount - (a.recovered ?? 0)), 0)) };
 }
 
-/** Creates or refreshes draft payroll rows for a month. Paid rows are never touched; manual extras are kept. */
-export async function generatePayroll(month: string, policy: PayrollPolicy) {
-  const today = dateKey();
-  const upTo = month < today.slice(0, 7) ? monthDays(month).at(-1)! : today;
-  const staff = await Staff.find({ active: true }).lean();
+/**
+ * Creates or refreshes draft payroll rows for a month.
+ * Salary is the fixed monthly salary — attendance and leave are recorded but do not change pay.
+ * Only monthly-salaried staff are on payroll; daily-wage tour staff are paid on each tour's cost sheet.
+ * Paid rows are never touched; bonus and deductions entered by hand are kept.
+ */
+export async function generatePayroll(month: string, _policy?: PayrollPolicy) {
+  void _policy;
   const days = monthDays(month);
-  const recs = await Attendance.find({ date: { $gte: days[0], $lte: days.at(-1)! } }).lean();
-  const byStaff = new Map<string, Rec[]>();
-  for (const r of recs) byStaff.set(String(r.staff), [...(byStaff.get(String(r.staff)) ?? []), r as Rec]);
+  const staff = await Staff.find({ active: true, salaryType: "monthly" }).lean();
+  // drafts left over for staff no longer on monthly payroll
+  const keep = staff.filter((st) => !(st.joinDate && dateKey(st.joinDate) > days.at(-1)!)).map((s) => s._id);
+  await Payroll.deleteMany({ month, status: "draft", staff: { $nin: keep } });
   let created = 0;
   let updated = 0;
   for (const st of staff) {
     if (st.joinDate && dateKey(st.joinDate) > days.at(-1)!) continue; // joins after this month
     const existing = await Payroll.findOne({ staff: st._id, month });
     if (existing?.status === "paid") continue;
-    const sum = summarise(month, byStaff.get(String(st._id)) ?? [], policy, { upTo, joinDate: st.joinDate });
-    const earned = earnedFor(st, sum);
+    const earned = round2(st.salary);
     const adv = await outstandingAdvances(st._id);
-    const extras = existing ? { allowances: existing.allowances, bonus: existing.bonus, otherDeduction: existing.otherDeduction } : { allowances: 0, bonus: 0, otherDeduction: 0 };
-    const gross = earned + extras.allowances + extras.bonus - extras.otherDeduction;
+    const extras = { allowances: 0, bonus: existing?.bonus ?? 0, otherDeduction: existing?.otherDeduction ?? 0 };
+    const gross = earned + extras.bonus - extras.otherDeduction;
     const wantAdvance = existing ? existing.advanceDeduction : adv.total;
     const advanceDeduction = round2(Math.max(0, Math.min(wantAdvance, adv.total, gross)));
-    const { elapsedWorkingDays: _e, ...counts } = sum;
-    void _e;
-    const doc = { staff: st._id, month, salaryType: st.salaryType, rate: st.salary, ...counts, earned, ...extras, advanceDeduction, net: netPay({ earned, ...extras, advanceDeduction }), isDemo: st.isDemo };
+    const counts = { workingDays: 0, presentDays: 0, halfDays: 0, paidLeaves: 0, holidays: 0, unpaidDays: 0, unmarkedDays: 0, pendingLeaves: 0, lateDays: 0 };
+    const doc = { staff: st._id, month, salaryType: "monthly", rate: st.salary, ...counts, earned, ...extras, advanceDeduction, net: netPay({ earned, ...extras, advanceDeduction }), isDemo: st.isDemo };
     if (existing) {
       existing.set(doc);
       await existing.save();
@@ -137,7 +139,7 @@ export async function generatePayroll(month: string, policy: PayrollPolicy) {
       created++;
     }
   }
-  return { created, updated, provisional: upTo < days.at(-1)! };
+  return { created, updated, provisional: false };
 }
 
 /** Applies a paid payroll's advance deduction to the oldest outstanding advances. */

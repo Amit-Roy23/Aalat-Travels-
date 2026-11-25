@@ -252,13 +252,13 @@ export function InvoiceDocument({ inv, company, bank, className }: { inv: Invoic
             <p className="whitespace-pre-line">{inv.remarks.trim()}</p>
           </div>
         )}
-        {inv.notes && <p className="mt-6 text-sm italic text-[#52575f]">{inv.notes}</p>}
         {inv.terms && (
-          <div className="mt-5 border-t border-[#e6e1d7] pt-4">
+          <div className="mt-6 border-t border-[#e6e1d7] pt-4">
             <p className="text-[10.5px] font-bold uppercase tracking-wider text-[#6b7078]">Terms & conditions</p>
             <p className="mt-1 whitespace-pre-line text-xs leading-relaxed text-[#6b7078]">{inv.terms}</p>
           </div>
         )}
+        {inv.notes && <p className="mt-6 whitespace-pre-line text-center text-[15px] font-medium italic text-[#52575f]">{inv.notes}</p>}
       </div>
       {bank && <PartnerLogos settings={bank} className="border-t border-[#e6e1d7] py-4 sm:px-10" />}
     </article>

@@ -12,7 +12,8 @@ export const PATCH = route<P>(async (req, { params }) => {
   if (!p) throw new HttpError(404, "Payroll entry not found.");
   if (p.status === "paid") throw new HttpError(409, "This salary is already paid. Reopen it to make changes.");
   const data = await body(req, PayrollPatch);
-  for (const [k, v] of Object.entries(data)) if (v !== undefined) p.set(k, v);
+  for (const [k, v] of Object.entries(data)) if (v !== undefined && k !== "allowances") p.set(k, v);
+  p.allowances = 0; // allowances are no longer part of payroll
   const adv = await outstandingAdvances(p.staff);
   if (p.advanceDeduction > adv.total + 0.005) throw new HttpError(400, `Advance deduction can't exceed the outstanding advance of ${money(adv.total)}.`);
   p.net = netPay(p);

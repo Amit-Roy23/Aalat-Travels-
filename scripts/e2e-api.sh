@@ -168,7 +168,10 @@ LM=$(date -d "$(date +%Y-%m-01) -1 day" +%Y-%m)
 check "advance recorded" $(req -d '{"amount":5000,"date":"'$TODAY'","note":"Festival"}' $B/api/staff/$SID/advances | jq_ "d['advance']['amount']") 5000
 check "payroll generated for last month" $(req -d "{\"month\":\"$LM\"}" $B/api/payroll | jq_ "d['created']>0") True
 PR=$(req "$B/api/payroll?month=$LM" | jq_ "next(r['_id'] for r in d['items'] if r['staff']['_id']=='$SID')")
-check "advance auto-deducted (capped by earned)" $(req "$B/api/payroll?month=$LM" | jq_ "next(r['advanceDeduction'] for r in d['items'] if r['_id']=='$PR')") 0
+check "salary = full monthly salary (attendance not deducted)" $(req "$B/api/payroll?month=$LM" | jq_ "next(int(r['earned']) for r in d['items'] if r['_id']=='$PR')") 26000
+check "advance auto-deducted from salary" $(req "$B/api/payroll?month=$LM" | jq_ "next(int(r['advanceDeduction']) for r in d['items'] if r['_id']=='$PR')") 5000
+check "daily-wage staff not on monthly payroll" $(req "$B/api/payroll?month=$LM" | jq_ "all(r['salaryType']=='monthly' for r in d['items'])") True
+check "allowances ignored" $(req -X PATCH -d '{"allowances":999}' $B/api/payroll/$PR | jq_ "int(d['payroll']['allowances'])") 0
 check "over-recovery blocked" $(code -X PATCH -d '{"advanceDeduction":6000,"bonus":40000}' $B/api/payroll/$PR) 400
 check "adjust: bonus + 5000 advance recovery" $(req -X PATCH -d '{"bonus":40000,"advanceDeduction":5000}' $B/api/payroll/$PR | jq_ "d['payroll']['net']==d['payroll']['earned']+40000-5000") True
 check "mark paid → advance recovered" $(req -d "{\"date\":\"$TODAY\",\"method\":\"upi\"}" $B/api/payroll/$PR/pay >/dev/null; req $B/api/staff/$SID/advances | jq_ "d['items'][0]['recovered']") 5000
